@@ -24,6 +24,10 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of processes in THREAD_ASLEEP state, this is, processes
+   that are waiting for sleep_ticks. */
+static struct list asleep_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -91,6 +95,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&asleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -577,6 +582,58 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+/* Adds the thread to list of asleep threads
+   after setting its status to THREAD_ASLEEP
+   and calls scheduler. */
+void
+thread_add_to_asleep_list (struct thread *t)
+{
+  /* Set thread status to THREAD_ASLEEP. */
+  t->status = THREAD_ASLEEP;
+
+  /* Add to list of asleep threads. */
+  list_push_back (&asleep_list, &t->elem);
+
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  schedule ();
+  intr_set_level (old_level);
+}
+
+/* Checks sleeping threads' sleep time and if
+   enough time has passed, transition the
+   thread(s) to THREAD_READY state. */
+void
+thread_check_and_awake_asleep_threads (int64_t ticks_start)
+{
+  struct list_elem *iter;
+  struct list threads_to_awake;
+
+  list_init (&threads_to_awake);
+
+  for (iter = list_begin (&asleep_list); iter != list_end (&asleep_list);
+       iter = list_next (iter))
+  {
+    struct thread *t = list_entry (iter, struct thread, elem);
+
+    if (ticks_start >= t->ticks_sleep)
+    {
+      list_push_back (&threads_to_awake, iter);
+
+      t->status = THREAD_READY;
+      list_push_back (&ready_list, &t->elem);
+    }
+  }
+
+  /* Remove the threads from asleep_list */
+  /* WHAT? check list_remove */
+  for (iter = list_begin (&threads_to_awake); iter != list_end (&threads_to_awake);
+       iter = list_next (iter))
+  {
+    list_remove (iter);
+  }
 }
 
 /* Offset of `stack' member within `struct thread'.
