@@ -241,7 +241,7 @@ thread_unblock (struct thread *t)
   ASSERT (is_thread (t));
 
   old_level = intr_disable ();
-  ASSERT (t->status == THREAD_BLOCKED);
+  ASSERT (t->status == THREAD_BLOCKED || t->status == THREAD_ASLEEP);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -584,20 +584,36 @@ allocate_tid (void)
   return tid;
 }
 
+bool
+thread_sleep_time_less (const struct list_elem *a,
+                        const struct list_elem *b,
+                        void *aux)
+{
+  struct thread *t1 = list_entry (a, struct thread, elem);
+  struct thread *t2 = list_entry (b, struct thread, elem);
+
+  return (t1->ticks_sleep < t2->ticks_sleep);
+}
+
 /* Adds the thread to list of asleep threads
    after setting its status to THREAD_ASLEEP
    and calls scheduler. */
 void
 thread_add_to_asleep_list (struct thread *t)
 {
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+
   /* Set thread status to THREAD_ASLEEP. */
   t->status = THREAD_ASLEEP;
 
   /* Add to list of asleep threads. */
-  list_push_back (&asleep_list, &t->elem);
-
-  enum intr_level old_level;
-  old_level = intr_disable ();
+  /* Problematic */
+  if (cur != idle_thread)
+  {
+    list_insert_ordered (&asleep_list, &t->elem, thread_sleep_time_less, NULL);
+  }
   schedule ();
   intr_set_level (old_level);
 }
@@ -606,36 +622,26 @@ thread_add_to_asleep_list (struct thread *t)
    enough time has passed, transition the
    thread(s) to THREAD_READY state. */
 void
-thread_check_and_awake_asleep_threads (int64_t ticks_start)
+thread_check_and_awake_asleep_threads(int64_t ticks_start)
 {
-  struct list_elem *iter;
-  struct list threads_to_awake;
-
-  list_init (&threads_to_awake);
-
-  for (iter = list_begin (&asleep_list); iter != list_end (&asleep_list);
-       iter = list_next (iter))
+  while (!list_empty(&asleep_list))
   {
-    struct thread *t = list_entry (iter, struct thread, elem);
+    struct list_elem *iter = list_front(&asleep_list);
+
+    struct thread *t = list_entry(iter, struct thread, elem);
 
     if (ticks_start >= t->ticks_sleep)
     {
-      list_push_back (&threads_to_awake, iter);
+      list_pop_front(&asleep_list);
 
-      t->status = THREAD_READY;
-      list_push_back (&ready_list, &t->elem);
+      thread_unblock(t);
+    }
+    else
+    {
+      break;
     }
   }
-
-  /* Remove the threads from asleep_list */
-  /* WHAT? check list_remove */
-  for (iter = list_begin (&threads_to_awake); iter != list_end (&threads_to_awake);
-       iter = list_next (iter))
-  {
-    list_remove (iter);
-  }
 }
-
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

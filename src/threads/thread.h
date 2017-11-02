@@ -141,7 +141,10 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void thread_check_and_awake_asleep_threads (int64_t ticks_start);
+bool thread_sleep_time_less (const struct list_elem *,
+                             const struct list_elem *,
+                             void *);
 void thread_add_to_asleep_list (struct thread *t);
+void thread_check_and_awake_asleep_threads(int64_t ticks_start);
 
 #endif /* threads/thread.h */
