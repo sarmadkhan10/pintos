@@ -584,6 +584,9 @@ allocate_tid (void)
   return tid;
 }
 
+/* Compares the ticks_sleep attribute of the input thread
+   and returns true if the first thread's ticks_sleep is
+   less than the second's. */
 bool
 thread_sleep_time_less (const struct list_elem *a,
                         const struct list_elem *b,
@@ -595,9 +598,8 @@ thread_sleep_time_less (const struct list_elem *a,
   return (t1->ticks_sleep < t2->ticks_sleep);
 }
 
-/* Adds the thread to list of asleep threads
-   after setting its status to THREAD_ASLEEP
-   and calls scheduler. */
+/* Adds the thread to list of asleep threads after setting
+   its status to THREAD_ASLEEP and calls scheduler. */
 void
 thread_add_to_asleep_list (struct thread *t)
 {
@@ -608,39 +610,44 @@ thread_add_to_asleep_list (struct thread *t)
   /* Set thread status to THREAD_ASLEEP. */
   t->status = THREAD_ASLEEP;
 
-  /* Add to list of asleep threads. */
-  /* Problematic */
+  /* Don't insert idle thread in asleep_list since it is
+     not present in ready_list. */
   if (cur != idle_thread)
-  {
-    list_insert_ordered (&asleep_list, &t->elem, thread_sleep_time_less, NULL);
-  }
+    {
+      list_insert_ordered (&asleep_list, &t->elem, thread_sleep_time_less, NULL);
+    }
   schedule ();
   intr_set_level (old_level);
 }
 
-/* Checks sleeping threads' sleep time and if
-   enough time has passed, transition the
-   thread(s) to THREAD_READY state. */
+/* Checks sleeping threads' sleep time and if enough time has
+   passed, removes them from asleep_list and unblocks them. */
 void
 thread_check_and_awake_asleep_threads(void)
 {
+  int64_t os_ticks = timer_ticks ();
+
   while (!list_empty(&asleep_list))
-  {
-    struct list_elem *iter = list_front(&asleep_list);
-
-    struct thread *t = list_entry(iter, struct thread, elem);
-
-    if (timer_ticks () >= t->ticks_sleep)
     {
-      list_pop_front(&asleep_list);
+      struct list_elem *iter = list_front(&asleep_list);
 
-      thread_unblock(t);
+      struct thread *t = list_entry(iter, struct thread, elem);
+
+      /* if the thread's sleep time has expired, remove
+         it from asleep_list and unblock. */
+      if (os_ticks >= t->ticks_sleep)
+        {
+          list_pop_front(&asleep_list);
+
+          thread_unblock(t);
+        }
+      /* since asleep_list is sorted according to
+         ticks_asleep, we can break out of the loop. */
+      else
+        {
+          break;
+        }
     }
-    else
-    {
-      break;
-    }
-  }
 }
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

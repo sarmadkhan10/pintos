@@ -98,8 +98,7 @@ timer_sleep (int64_t ticks)
   /* Set ticks_sleep. */
   t->ticks_sleep = start + ticks;
 
-  /* add current thread to asleep threads
-     list and sleep. */
+  /* add current thread to asleep threads list and sleep. */
   thread_add_to_asleep_list (t);
 }
 
