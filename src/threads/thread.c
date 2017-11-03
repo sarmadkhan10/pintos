@@ -622,7 +622,7 @@ thread_add_to_asleep_list (struct thread *t)
    enough time has passed, transition the
    thread(s) to THREAD_READY state. */
 void
-thread_check_and_awake_asleep_threads(int64_t ticks_start)
+thread_check_and_awake_asleep_threads(void)
 {
   while (!list_empty(&asleep_list))
   {
@@ -630,7 +630,7 @@ thread_check_and_awake_asleep_threads(int64_t ticks_start)
 
     struct thread *t = list_entry(iter, struct thread, elem);
 
-    if (ticks_start >= t->ticks_sleep)
+    if (timer_ticks () >= t->ticks_sleep)
     {
       list_pop_front(&asleep_list);
 

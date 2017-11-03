@@ -145,6 +145,6 @@ bool thread_sleep_time_less (const struct list_elem *,
                              const struct list_elem *,
                              void *);
 void thread_add_to_asleep_list (struct thread *t);
-void thread_check_and_awake_asleep_threads(int64_t ticks_start);
+void thread_check_and_awake_asleep_threads (void);
 
 #endif /* threads/thread.h */

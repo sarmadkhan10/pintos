@@ -87,7 +87,7 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
 
@@ -179,7 +179,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  thread_check_and_awake_asleep_threads (timer_ticks ());
+  thread_check_and_awake_asleep_threads ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
