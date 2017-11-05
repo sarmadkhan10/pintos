@@ -135,7 +135,6 @@ main (void)
   /* Finish up. */
   shutdown ();
   thread_exit ();
-  printf ("main exit\n");
 }
 
 /* Clear the "BSS", a segment that should be initialized to
