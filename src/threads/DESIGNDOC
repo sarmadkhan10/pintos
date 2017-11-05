@@ -1,0 +1,204 @@
+			+--------------------+
+			|         OS         |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+Hamza Anwar          <s8haanwa@stud.uni-saarland.de>
+Muhammad Sarmad Khan <s8mukhan@stud.uni-saarland.de>
+
+---- PRELIMINARIES ----
+
+https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+static struct list asleep_list;
+This structure maintains the list of all the threads currently
+sleeping by invoking timer_sleep ();
+
+enum thread_status
+  {
+    THREAD_RUNNING,     /* Running thread. */
+    THREAD_READY,       /* Not running but ready to run. */
+    THREAD_BLOCKED,     /* Waiting for an event to trigger. */
+    THREAD_ASLEEP,      /* Sleeping for sleep_ticks ticks. */
+    THREAD_DYING        /* About to be destroyed. */
+  };
+Added THREAD_ASLEEP status to indicate that the thread is in
+sleep state.
+
+struct thread
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          /* Thread identifier. */
+    enum thread_status status;          /* Thread state. */
+    char name[16];                      /* Name (for debugging purposes). */
+    uint8_t *stack;                     /* Saved stack pointer. */
+    int priority;                       /* Priority. */
+    struct list_elem allelem;           /* List element for all threads list. */
+
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
+    int64_t ticks_sleep;                /* Ticks the threads will sleep for. */
+
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+#endif
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+  };
+Added ticks_sleep attribute to this structure which indicates the
+sleep time of this thread if the thread is in THREAD_ASLEEP state.
+If the thread is not in ASLEEP_STATE, this attribute’s value is
+of no meaning.
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+When a thread call timer_sleep(), the ‘awake_time’ is calculated
+And stored in the thread struct’s ticks_sleep attribute. The thread
+is then put to THREAD_ASLEEP state and the thread’s struct is added
+To asleep_list. This list is sorted according to ticks_sleep. On
+every timer interrupt, this list is traversed to see if a thread’s
+sleep time has expired. If that is the case, this thread is removed
+from this list and is put to THREAD_READY state.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+As described above, on each timer interrupt asleep_list is traversed.
+This list is already sorted according to ticks_sleep attribute. So,
+In most cases, not the whole list will be traversed. Instead, let’s
+say if in the list, the first thread’s sleep time has not expired,
+the other members of the list will not be traversed as it is implied
+their sleep time has not expired as well. This saves time.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+In our implementation, if multiple threads call timer_sleep simultaneously,
+the only race condition can occur for adding threads to asleep_list. However,
+since we disable interrupts from this operation and enable them afterwards,
+this race condition is avoided.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+timer_sleep() calls thread_add_to_asleep_list() which disables interrupts.
+So if a timer interrupt occurs, its service will be delayed so that
+thread_add_to_asleep_list() execution is completed.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+Another design we considered was adding threads to asleep_list without
+Sorting them according to ticks_sleep as sorting is an expensive operation.
+We decided against this design because this would have increased the time
+spent in the timer interrupt handler as the whole asleep_list would have
+to be traversed to see if any of threads need to be awaken. So maintaining
+a sorted asleep_list is a reasonable tradeoff to ensure minimum time in spent
+In the timer interrupt handler.
+
+
+    			     PROD/CONS
+	  		     =========
+
+---- SYNCHRONIZATION ----
+
+>> B1: How does your solution guarantee that consumers will hold until
+>> there is something to consume in the buffer?
+The consumer checks if the buffer is empty and if it is, it waits on the
+not_empty condition variable. This conditional variable is signaled by the
+producer after producing an item.
+
+>> B2: How does your solution guarantee that producers will hold until
+>> there is some free space in the buffer?
+The producer checks if the buffer is full and if it is, it waits on the
+not_full condition variable. This conditional variable is signaled by the
+Consumer after consuming an item.
+
+>> B3: How does your solution preserve a FIFO semantics i.e., the first
+>> character produced will be the first to be consumed?
+It is ensured by maintaining the buffer as a queue. The producer pushes
+the items at one end of the queue and the consumer pops the items from
+The other end to ensure FIFO semantics.
+
+---- RATIONALE ----
+
+>> B4: Give an intuition for why your program preserves safety.
+Only one producer or consumer can acquire the lock at a time. This ensures
+that the buffer can be manipulated by a single entity only a time which
+preserves safety. 
+
+>> B5: Why did you choose this design? Did you consider other design 
+>> alternatives? In what ways is it superior to another design you considered?
+This design was the only one considered by us as it simply used condition
+variables to achieve synchronization. Using condition variables makes
+the code cleaner and easy to write.
+
+
+			     NARROW BRIDGE
+			     =============
+
+---- SYNCHRONIZATION ----
+
+>> C1: How does your solution guarantee that no more that 3 vehicles 
+>> are crossing the bridge in the same direction?
+
+>> C2: What prevents vehicles from opposite directions from crossing the
+>> bridge simultaneously?
+
+>> C3: How does your solution grant priority to emergency vehicles over
+>> the queue of vehicles ahead in the same direction?
+
+>> C4: How do you guarantee that despite having priority, emergency vehicles
+>> do not start crossing the bridge while there are still vehicles crossing
+>> it in the oposite direction?
+
+>> C5: Explain with examples why your solution does not preserve neither 
+>> fairness nor freedom from starvation, other than what has been indicated 
+>> for emergency vehicles.
+
+---- RATIONALE ----
+
+>> C6: Why did you choose this design? Did you consider other design 
+>> alternatives? In what ways is it superior to another design you considered?
+
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future semesters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the semester.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future semesters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future semesters or the remaining projects?
+
+>> Any other comments?
