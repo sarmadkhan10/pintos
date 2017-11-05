@@ -158,26 +158,41 @@ the code cleaner and easy to write.
 
 >> C1: How does your solution guarantee that no more that 3 vehicles 
 >> are crossing the bridge in the same direction?
+Vehicles in opposite direction must be 0 and the vehicles in the current direction
+must be less than 3 this condition allows the loop to run arrive_bridge::while_loop
 
 >> C2: What prevents vehicles from opposite directions from crossing the
 >> bridge simultaneously?
+the number of vehicles in the opposite direction should be 0 in the arrive_bridge::while_loop
 
 >> C3: How does your solution grant priority to emergency vehicles over
 >> the queue of vehicles ahead in the same direction?
+normal vehicles will not be in the bridge if any emergency/priority is in the waiting list this
+is also being checked in arrive_bridge::while_loop
 
 >> C4: How do you guarantee that despite having priority, emergency vehicles
 >> do not start crossing the bridge while there are still vehicles crossing
 >> it in the oposite direction?
+the number of vehicles in the opposite direction should be 0 in the arrive_bridge::while_loop
+
 
 >> C5: Explain with examples why your solution does not preserve neither 
 >> fairness nor freedom from starvation, other than what has been indicated 
 >> for emergency vehicles.
+if both lanes have priortiy/emergency vehicles waiting then our code does not change the main signal
+directions so the priority is given to the emergency vehicles and normal vehicles cannot cross the bridge,
+therefore all priority vehicles must cross the bridge before the normal vehicles can cross it
+the only time the direction is changed when one of the lanes has emergency/priority vehicles waiting.
 
 ---- RATIONALE ----
 
 >> C6: Why did you choose this design? Did you consider other design 
 >> alternatives? In what ways is it superior to another design you considered?
-
+We used 4 semaphores one for each direction and priority as intuitaively we are dealing
+with the 4 params left_normal,left emergency,right_normal,right_emergency which allows
+us to wakeup exactly those threads which are from the desired category, originally we thought
+it would be good to map the problem in an object oriented way but then the bottleneck would be
+the class which is storing the lock information.
 
 			   SURVEY QUESTIONS
 			   ================
