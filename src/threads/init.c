@@ -128,13 +128,14 @@ main (void)
 #endif
 
   printf ("Boot complete.\n");
-  
+
   /* Run actions specified on kernel command line. */
   run_actions (argv);
 
   /* Finish up. */
   shutdown ();
   thread_exit ();
+  printf ("main exit\n");
 }
 
 /* Clear the "BSS", a segment that should be initialized to
