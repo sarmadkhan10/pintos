@@ -86,7 +86,7 @@ void producer_consumer(UNUSED unsigned int num_producer, UNUSED unsigned int num
 void producer (void* items_to_produce)
 {
   char *items_prod = (char *) items_to_produce;
-  int i;
+  unsigned int i;
 
   /* produce data string one char at a time. */
   for (i = 0; i < (sizeof (data) / sizeof (char)); i++)
