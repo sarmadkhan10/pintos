@@ -7,14 +7,30 @@
 
 static void syscall_handler (struct intr_frame *);
 
+/* Checks the validity of the user vaddr. Returns true if uaddr is not
+   null, is not a pointer to kernel vitrual addr. space and is not a
+   pointer to unmapped memory. */
+static bool
+is_uaddr_valid (void *uaddr)
+{
+  bool valid = false;
+
+  if ((uaddr != NULL) && (is_user_vaddr (uaddr)))
+    {
+      if (pagedir_get_page (thread_current()->pagedir, uaddr) != NULL)
+	{
+	  valid = true;
+	}
+    }
+
+  return valid;
+}
+
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
-
-
-
 
 void syscall_halt(void){
 	//TODO: to implement
