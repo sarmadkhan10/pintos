@@ -32,69 +32,100 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-void syscall_halt(void){
+void 
+syscall_halt(void)
+{
 	//TODO: to implement
 }
 
-void syscall_exit(int status){
+void 
+syscall_exit(int status)
+{
 	//TODO: to implement
 }
 
 
-pid_t syscall_exec(const char* cmd_line){
+pid_t 
+syscall_exec(const char* cmd_line)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-int syscall_wait(pid_t pid){
+int 
+syscall_wait(pid_t pid)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-bool syscall_create(const char* file,unsigned initial_size){
+bool 
+syscall_create(const char* file,unsigned initial_size)
+{
 	//TODO: to implement
 	return false;
 }
 
 
-bool syscall_remove(const char* file){
+bool 
+syscall_remove(const char* file)
+{
 	//TODO: to implement
 	return false;
 }
 
 
-int syscall_open(const char* file){
+int 
+syscall_open(const char* file)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-int syscall_filesize(int fd){
+int 
+syscall_filesize(int fd)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-int syscall_read(int fd,void* buffer, unsigned size){
+int 
+syscall_read(int fd,void* buffer, unsigned size)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-void syscall_seek(int fd,unsigned position){
+int 
+syscall_write(int fd, const void *buffer,unsigned size)
+{
+	//TODO: to implement
+	return 0;
+}
+
+void 
+syscall_seek(int fd,unsigned position)
+{
 	//TODO: to implement
 }
 
 
-unsigned syscall_tell(int fd){
+unsigned 
+syscall_tell(int fd)
+{
 	//TODO: to implement
 	return 0;
 }
 
 
-void syscall_close(int fd){
+void 
+syscall_close(int fd)
+{
 	//TODO: to implement
 }
 
