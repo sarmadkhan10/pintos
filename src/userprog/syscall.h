@@ -2,13 +2,30 @@
 #define USERPROG_SYSCALL_H
 
 #include "threads/thread.h"
+#include "threads/interrupt.h"
 #include "userprog/process.h"
 
 //Process Identifier ID
 typedef int pid_t;
 
+#define SYSCALL_TOTAL 13
 
 void syscall_init (void);
+
+/* syscall wrappers */
+int _syscall_halt (struct intr_frame *f);
+int _syscall_exit (struct intr_frame *f);
+int _syscall_exec (struct intr_frame *f);
+int _syscall_wait (struct intr_frame *f);
+int _syscall_create (struct intr_frame *f);
+int _syscall_remove (struct intr_frame *f);
+int _syscall_open (struct intr_frame *f);
+int _syscall_filesize (struct intr_frame *f);
+int _syscall_read (struct intr_frame *f);
+int _syscall_write (struct intr_frame *f);
+int _syscall_seek (struct intr_frame *f);
+int _syscall_tell (struct intr_frame *f);
+int _syscall_close (struct intr_frame *f);
 
 //user implemented methods
 void syscall_halt(void);

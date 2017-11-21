@@ -17,9 +17,19 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+
+static struct list processes_dead;
+
+/* initializes process related data structures. */
+void
+process_init (void)
+{
+  list_init (&processes_dead);
+}
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -30,6 +40,7 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  struct thread *t;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -42,6 +53,18 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+
+  if (tid != TID_ERROR)
+    {
+      /* initialize process related members of thread struct. */
+      t = thread_retrieve (tid);
+
+      if (t != NULL) /* shouldn't be NULL in any case */
+        {
+          t->parent_tid = thread_tid ();
+          //t->waiting_on = -1;
+        }
+    }
   return tid;
 }
 
@@ -64,7 +87,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
+    thread_exit (0);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -94,10 +117,20 @@ process_wait (tid_t child_tid UNUSED)
 
 /* Free the current process's resources. */
 void
-process_exit (void)
+process_exit (int status)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  struct process_info *p_info = malloc (sizeof (struct process_info));
+
+  p_info->tid = cur->tid;
+  p_info->parent_tid = cur->parent_tid;
+  p_info->status_code = status;
+
+  list_push_back (&processes_dead, &p_info->elem);
+
+  // TODO: remove child processes from processes_dead
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

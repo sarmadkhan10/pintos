@@ -99,6 +99,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    tid_t parent_tid;                   /* process's parent tid */
+    //tid_t waiting on;                   /* tid of child if wait() is called on it. Otherwise -1 */
 #endif
 
     /* Owned by thread.c. */
@@ -126,7 +128,7 @@ struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
-void thread_exit (void) NO_RETURN;
+void thread_exit (int status) NO_RETURN;
 void thread_yield (void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
@@ -146,5 +148,9 @@ bool thread_sleep_time_less (const struct list_elem *,
                              void *);
 void thread_add_to_asleep_list (struct thread *t);
 void thread_check_and_awake_asleep_threads (void);
+
+#ifdef USERPROG
+struct thread * thread_retrieve (tid_t tid);
+#endif /* USERPROG */
 
 #endif /* threads/thread.h */

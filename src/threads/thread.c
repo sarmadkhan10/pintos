@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -283,12 +284,12 @@ thread_tid (void)
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void
-thread_exit (void) 
+thread_exit (int status)
 {
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  process_exit ();
+  process_exit (status);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -427,7 +428,7 @@ kernel_thread (thread_func *function, void *aux)
 
   intr_enable ();       /* The scheduler runs with interrupts off. */
   function (aux);       /* Execute the thread function. */
-  thread_exit ();       /* If function() returns, kill the thread. */
+  thread_exit (0);       /* If function() returns, kill the thread. */
 }
 
 /* Returns the running thread. */
@@ -590,7 +591,7 @@ allocate_tid (void)
 bool
 thread_sleep_time_less (const struct list_elem *a,
                         const struct list_elem *b,
-                        void *aux)
+                        void *aux UNUSED)
 {
   struct thread *t1 = list_entry (a, struct thread, elem);
   struct thread *t2 = list_entry (b, struct thread, elem);
@@ -649,6 +650,36 @@ thread_check_and_awake_asleep_threads(void)
         }
     }
 }
+
+#ifdef USERPROG
+/* Get thread pointer using its tid. Returns NULL if not found. */
+struct thread *
+thread_retrieve (tid_t tid)
+  {
+    struct list_elem *e;
+    struct thread *t_retrieved = NULL;
+
+    enum intr_level old_level;
+    old_level = intr_disable ();
+
+    for (e = list_begin (&all_list); e != list_end (&all_list);
+         e = list_next (e))
+      {
+        struct thread *t = list_entry (e, struct thread, allelem);
+
+        if (t->tid == tid)
+          {
+            t_retrieved = t;
+            break;
+          }
+      }
+
+    intr_set_level (old_level);
+
+    return t_retrieved;
+  }
+#endif /* USERPROG */
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
