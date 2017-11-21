@@ -38,34 +38,49 @@ process_init (void)
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
-  tid_t tid;
-  struct thread *t;
+    char *fn_copy;
+    char *program, *args;
 
-  /* Make a copy of FILE_NAME.
+    tid_t tid;
+
+    struct thread *t;
+
+    struct thread_child *child_thread;
+    struct thread *current_thread;
+
+    /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+    fn_copy = palloc_get_page (0);
+    if (fn_copy == NULL)
+      return TID_ERROR;
+    strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    //Split Program-name and arguments
+    //http://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
+    program = strtok_r (fn_copy, " ", &args);
 
-  if (tid != TID_ERROR)
-    {
-      /* initialize process related members of thread struct. */
-      t = thread_retrieve (tid);
+    //Create new thread with program name/args
+    tid = thread_create (program, PRI_DEFAULT, start_process, args);
+    if (tid == TID_ERROR)
+      {
+        palloc_free_page (fn_copy);
+      }
+    else
+      {
+        current_thread = thread_current ();
+        child_thread = calloc (1, sizeof *child_thread);
+        if (child_thread != NULL)
+  	{
+  	  child_thread->child_id = tid;
+  	  child_thread->is_exit = false;
+  	  child_thread->is_wait = false;
+  	  //add to children thread list
+  	  list_push_back (&current_thread->children,
+  			  &child_thread->child_element_status);
+  	}
 
-      if (t != NULL) /* shouldn't be NULL in any case */
-        {
-          t->parent_tid = thread_tid ();
-          //t->waiting_on = -1;
-        }
-    }
-  return tid;
+      }
+    return tid;
 }
 
 /* A thread function that loads a user process and starts it

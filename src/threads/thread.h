@@ -25,6 +25,16 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+//child status thread
+struct thread_child {
+  tid_t child_id;
+  bool is_exit;
+  bool is_wait;
+  int exit_status;
+  struct list_elem child_element_status;
+};
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -101,6 +111,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     tid_t parent_tid;                   /* process's parent tid */
     //tid_t waiting on;                   /* tid of child if wait() is called on it. Otherwise -1 */
+    struct list children;		/* list of children status */
 #endif
 
     /* Owned by thread.c. */

@@ -29,6 +29,24 @@ is_uaddr_valid (void *uaddr)
   return valid;
 }
 
+static struct file_descriptor *
+get_open_file (int fd)
+{
+  struct list_elem *elem;
+  struct file_descriptor *file_descriptor;
+  elem = list_tail (&useropened_files);
+  while ((elem = list_prev (elem)) != list_head (&useropened_files))
+    {
+      file_descriptor = list_entry (elem, struct file_descriptor, element);
+      if (file_descriptor->descriptor_id == fd)
+	{
+	  return file_descriptor;
+	}
+    }
+  return NULL;
+}
+
+
 void
 syscall_init (void) 
 {
@@ -151,7 +169,7 @@ _syscall_close(struct intr_frame *f UNUSED)
 void
 syscall_halt(void)
 {
-  //TODO: to implement
+  shutdown_power_off ();
 }
 
 
@@ -221,8 +239,61 @@ syscall_read(int fd UNUSED,void* buffer UNUSED, unsigned size UNUSED)
 int 
 syscall_write(int fd UNUSED, const void *buffer UNUSED,unsigned size UNUSED)
 {
-  //TODO: to implement
-  return 0;
+  int status = 0;
+    struct file_descriptor *file_descriptor;
+    unsigned temp_buffer_size = size;
+    void *temp_buffer = buffer;
+
+    //valid memory check
+    while (temp_buffer != NULL)
+      {
+        if (!is_uaddr_valid (temp_buffer))
+  	{
+  	  syscall_exit (-1);
+  	}
+        else
+  	{
+  	  //termination condition
+  	  if (temp_buffer_size == 0)
+  	    {
+  	      temp_buffer = NULL;
+  	    }
+  	  else if (temp_buffer_size > PGSIZE)
+  	    {
+  	      temp_buffer = temp_buffer + PGSIZE;
+  	      temp_buffer = temp_buffer - PGSIZE;
+  	    }
+
+  	  else
+  	    {
+  	      temp_buffer = buffer + size - 1;
+  	      temp_buffer_size = 0;
+  	    }
+  	}
+      }
+
+    lock_acquire (&filesystem_lock);
+    if (fd == STDIN_FILENO)
+      {
+        status = -1;
+      }
+    else if (fd == STDOUT_FILENO)
+      {
+        putbuf (buffer, size);
+        status = size;
+      }
+    else
+      {
+        file_descriptor = get_open_file (fd);
+        if (file_descriptor != NULL)
+  	{
+  	  status = file_write (file_descriptor->file, buffer, size);
+  	}
+      }
+    lock_release (&filesystem_lock);
+
+    return status;
+
 }
 
 void 
