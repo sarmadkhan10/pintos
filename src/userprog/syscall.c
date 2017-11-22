@@ -7,6 +7,12 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 
+//lock for File-System allowing one thread access per time
+struct lock filesystem_lock;
+
+//list of files opened by users-progs
+struct list useropened_files;
+
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
 
@@ -138,9 +144,22 @@ _syscall_read (struct intr_frame *f UNUSED)
 }
 
 int
-_syscall_write (struct intr_frame *f UNUSED)
+_syscall_write (struct intr_frame *f)
 {
-  //TODO: to implement
+  int fd;
+  char* buffer;
+  unsigned size;
+  int status;
+  int num_bytes;
+
+  fd = *((int *)f->esp + 1);
+  buffer = *(char **)f->esp + 8;
+  size = *((unsigned *)f->esp + 3);
+
+  num_bytes = syscall_write (fd, buffer, size);
+
+  f->eax = num_bytes;
+
   return 0;
 }
 
@@ -237,7 +256,7 @@ syscall_read(int fd UNUSED,void* buffer UNUSED, unsigned size UNUSED)
 
 
 int 
-syscall_write(int fd UNUSED, const void *buffer UNUSED,unsigned size UNUSED)
+syscall_write(int fd, const void *buffer,unsigned size)
 {
   int status = 0;
     struct file_descriptor *file_descriptor;

@@ -33,6 +33,8 @@ static struct list asleep_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+extern struct list useropened_files;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -98,6 +100,7 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&asleep_list);
   list_init (&all_list);
+  list_init (&useropened_files);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();

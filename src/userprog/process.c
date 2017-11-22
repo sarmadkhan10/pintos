@@ -22,6 +22,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+//struct list list_thread_children;
 static struct list processes_dead;
 
 /* initializes process related data structures. */
@@ -29,6 +30,7 @@ void
 process_init (void)
 {
   list_init (&processes_dead);
+  //list_init (&list_thread_children);
 }
 
 /* Starts a new thread running a user program loaded from
@@ -44,8 +46,8 @@ process_execute (const char *file_name)
     tid_t tid;
 
     struct thread *t;
+    struct thread_child *t_child;
 
-    struct thread_child *child_thread;
     struct thread *current_thread;
 
     /* Make a copy of FILE_NAME.
@@ -55,32 +57,17 @@ process_execute (const char *file_name)
       return TID_ERROR;
     strlcpy (fn_copy, file_name, PGSIZE);
 
-    //Split Program-name and arguments
-    //http://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
-    program = strtok_r (fn_copy, " ", &args);
+    /* Split Program-name and arguments */
+    //program = strtok_r (fn_copy, " ", &args);
+    //printf ("program: %c", *program);
 
     //Create new thread with program name/args
-    tid = thread_create (program, PRI_DEFAULT, start_process, args);
+    tid = thread_create (fn_copy, PRI_DEFAULT, start_process, fn_copy);
+    printf ("here\n");
     if (tid == TID_ERROR)
       {
         palloc_free_page (fn_copy);
-      }
-    else
-      {
-        current_thread = thread_current ();
-        child_thread = calloc (1, sizeof *child_thread);
-        if (child_thread != NULL)
-  	{
-  	  child_thread->child_id = tid;
-  	  child_thread->is_exit = false;
-  	  child_thread->is_wait = false;
-  	  //add to children thread list
-  	  list_push_back (&current_thread->children,
-  			  &child_thread->child_element_status);
-  	}
-
-      }
-    return tid;
+      }return tid;
 }
 
 /* A thread function that loads a user process and starts it
@@ -263,6 +250,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  char *file_name_only;
+  char *save_ptr;
+  char *args;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -270,11 +260,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  file_name_only = strtok_r (file_name, " ", &save_ptr);
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (file_name_only);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", file_name_only);
       goto done; 
     }
 
@@ -486,7 +478,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }

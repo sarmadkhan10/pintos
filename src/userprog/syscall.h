@@ -5,15 +5,7 @@
 #include "threads/interrupt.h"
 #include "userprog/process.h"
 #include "threads/synch.h"
-
-//Process Identifier ID
-typedef int pid_t;
-
-//lock for File-System allowing one thread access per time
-struct lock filesystem_lock;
-
-//list of files opened by users-progs
-struct list useropened_files;
+#include "user/syscall.h"
 
 //file descriptor object
 struct file_descriptor
@@ -23,7 +15,6 @@ struct file_descriptor
   struct file *file;
   struct list_elem element;
 };
-
 
 #define SYSCALL_TOTAL 13
 

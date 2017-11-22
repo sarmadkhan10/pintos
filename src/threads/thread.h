@@ -28,7 +28,7 @@ typedef int tid_t;
 
 //child status thread
 struct thread_child {
-  tid_t child_id;
+  tid_t parent_tid;
   bool is_exit;
   bool is_wait;
   int exit_status;
