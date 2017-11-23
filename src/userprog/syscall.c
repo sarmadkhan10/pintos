@@ -6,6 +6,7 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "filesys/file.h"
 
 /**====================**/
 
@@ -188,26 +189,31 @@ syscall_exec(const char* cmd_line UNUSED)
 
 
 int
-syscall_wait(pid_t pid UNUSED)
+syscall_wait(pid_t pid)
 {
-  //TODO: to implement
-  return 0;
+  return process_wait(pid);
 }
 
 
 bool
-syscall_create(const char* file UNUSED,unsigned initial_size UNUSED)
+syscall_create(const char* file,unsigned initial_size)
 {
-  //TODO: to implement
-  return false;
+  bool success=false;
+  lock_acquire(&filesys_lock);
+  success = filesys_create(file,initial_size);
+  lock_release(&filesys_lock);
+  return success;
 }
 
 
 bool
-syscall_remove(const char* file UNUSED)
+syscall_remove(const char* file)
 {
-  //TODO: to implement
-  return false;
+  bool success = false;
+  lock_acquire(&filesys_lock);
+  success = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return success;
 }
 
 
@@ -228,10 +234,19 @@ syscall_open(const char* file)
 
 
 int
-syscall_filesize(int fd UNUSED)
+syscall_filesize(int fd)
 {
-  //TODO: to implement
-  return 0;
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+
+  if(!f)
+    {
+      lock_release(&filesys_lock);
+      return -1;
+    }
+  int size = file_length(f);
+  lock_release(&filesys_lock);
+  return size;
 }
 
 
@@ -272,17 +287,39 @@ return status;
 }
 
 void
-syscall_seek(int fd UNUSED,unsigned position UNUSED)
+syscall_seek(int fd,unsigned position)
 {
-  //TODO: to implement
+
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+  if(!f)
+    {
+      lock_release(&filesys_lock);
+    }
+  else{
+      file_seek(f,position);
+      lock_release(&filesys_lock);
+  }
+
 }
 
 
 unsigned
-syscall_tell(int fd UNUSED)
+syscall_tell(int fd)
 {
-  //TODO: to implement
-  return 0;
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+
+  if(!f)
+    {
+      lock_release(&filesys_lock);
+      return -1;
+    }
+
+  off_t offset = file_tell(f);
+  lock_release(&filesys_lock);
+  return offset;
+
 }
 
 
