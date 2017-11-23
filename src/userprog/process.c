@@ -21,6 +21,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void get_process_args (char *cmd, char** args, int *arg_count);
 
 //struct list list_thread_children;
 static struct list processes_dead;
@@ -63,7 +64,6 @@ process_execute (const char *file_name)
 
     //Create new thread with program name/args
     tid = thread_create (fn_copy, PRI_DEFAULT, start_process, fn_copy);
-    printf ("here\n");
     if (tid == TID_ERROR)
       {
         palloc_free_page (fn_copy);
@@ -250,9 +250,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-  char *file_name_only;
   char *save_ptr;
-  char *args;
+  char *args[5];                        /* max: 10 */
+  int arg_count;
+  //char fn_copy[50];
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -260,13 +261,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  file_name_only = strtok_r (file_name, " ", &save_ptr);
+  //strlcpy(fn_copy, file_name, 50);
+  get_process_args ((char *) file_name, args, &arg_count);
 
   /* Open executable file. */
-  file = filesys_open (file_name_only);
+  file = filesys_open ((const char *) args[0]);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name_only);
+      printf ("load: %s: open failed\n", args[0]);
       goto done; 
     }
 
@@ -343,7 +345,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, args, arg_count));
     goto done;
 
   /* Start address. */
@@ -468,7 +470,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char* args[], int* arg_count)
 {
   uint8_t *kpage;
   bool success = false;
@@ -503,4 +505,23 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/* get the process args + the number of args */
+static void
+get_process_args (char *cmd, char** args, int *arg_count)
+{
+  char *save_ptr;
+  char *tok;
+
+  *arg_count = 0;
+
+  /* parse all the arguments and keep their count */
+  for (tok = strtok_r (cmd, " ", &save_ptr); tok != NULL;
+      tok = strtok_r (NULL, " ", &save_ptr))
+    {
+      args[*arg_count] = tok;
+
+      *arg_count += 1;
+    }
 }
