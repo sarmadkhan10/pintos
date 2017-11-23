@@ -7,11 +7,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 
-//lock for File-System allowing one thread access per time
-struct lock filesystem_lock;
-
-//list of files opened by users-progs
-struct list useropened_files;
+/**====================**/
 
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
@@ -35,26 +31,9 @@ is_uaddr_valid (void *uaddr)
   return valid;
 }
 
-static struct file_descriptor *
-get_open_file (int fd)
-{
-  struct list_elem *elem;
-  struct file_descriptor *file_descriptor;
-  elem = list_tail (&useropened_files);
-  while ((elem = list_prev (elem)) != list_head (&useropened_files))
-    {
-      file_descriptor = list_entry (elem, struct file_descriptor, element);
-      if (file_descriptor->descriptor_id == fd)
-	{
-	  return file_descriptor;
-	}
-    }
-  return NULL;
-}
-
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   syscall_table[SYS_HALT] = _syscall_halt;
   syscall_table[SYS_EXIT] = _syscall_exit;
@@ -161,6 +140,7 @@ _syscall_write (struct intr_frame *f)
   f->eax = num_bytes;
 
   return 0;
+
 }
 
 int
@@ -192,14 +172,14 @@ syscall_halt(void)
 }
 
 
-void 
+void
 syscall_exit (int status)
 {
   thread_exit (status);
 }
 
 
-pid_t 
+pid_t
 syscall_exec(const char* cmd_line UNUSED)
 {
   //TODO: to implement
@@ -207,7 +187,7 @@ syscall_exec(const char* cmd_line UNUSED)
 }
 
 
-int 
+int
 syscall_wait(pid_t pid UNUSED)
 {
   //TODO: to implement
@@ -215,7 +195,7 @@ syscall_wait(pid_t pid UNUSED)
 }
 
 
-bool 
+bool
 syscall_create(const char* file UNUSED,unsigned initial_size UNUSED)
 {
   //TODO: to implement
@@ -223,7 +203,7 @@ syscall_create(const char* file UNUSED,unsigned initial_size UNUSED)
 }
 
 
-bool 
+bool
 syscall_remove(const char* file UNUSED)
 {
   //TODO: to implement
@@ -231,7 +211,7 @@ syscall_remove(const char* file UNUSED)
 }
 
 
-int 
+int
 syscall_open(const char* file UNUSED)
 {
   //TODO: to implement
@@ -239,7 +219,7 @@ syscall_open(const char* file UNUSED)
 }
 
 
-int 
+int
 syscall_filesize(int fd UNUSED)
 {
   //TODO: to implement
@@ -247,7 +227,7 @@ syscall_filesize(int fd UNUSED)
 }
 
 
-int 
+int
 syscall_read(int fd UNUSED,void* buffer UNUSED, unsigned size UNUSED)
 {
   //TODO: to implement
@@ -255,74 +235,30 @@ syscall_read(int fd UNUSED,void* buffer UNUSED, unsigned size UNUSED)
 }
 
 
-int 
+int
 syscall_write(int fd, const void *buffer,unsigned size)
 {
-  int status = 0;
-    struct file_descriptor *file_descriptor;
-    unsigned temp_buffer_size = size;
-    void *temp_buffer = buffer;
-
-    //valid memory check
-    while (temp_buffer != NULL)
-      {
-        if (!is_uaddr_valid (temp_buffer))
-  	{
-  	  syscall_exit (-1);
-  	}
-        else
-  	{
-  	  //termination condition
-  	  if (temp_buffer_size == 0)
-  	    {
-  	      temp_buffer = NULL;
-  	    }
-  	  else if (temp_buffer_size > PGSIZE)
-  	    {
-  	      temp_buffer = temp_buffer + PGSIZE;
-  	      temp_buffer = temp_buffer - PGSIZE;
-  	    }
-
-  	  else
-  	    {
-  	      temp_buffer = buffer + size - 1;
-  	      temp_buffer_size = 0;
-  	    }
-  	}
-      }
-
-    lock_acquire (&filesystem_lock);
-    if (fd == STDIN_FILENO)
-      {
-        status = -1;
-      }
-    else if (fd == STDOUT_FILENO)
-      {
-        putbuf (buffer, size);
-        status = size;
-      }
-    else
-      {
-        file_descriptor = get_open_file (fd);
-        if (file_descriptor != NULL)
-  	{
-  	  status = file_write (file_descriptor->file, buffer, size);
-  	}
-      }
-    lock_release (&filesystem_lock);
-
-    return status;
-
+  int status = -1;
+  //for console write
+  if(fd == STDOUT_FILENO){
+      putbuf((char *)buffer, (size_t)size);
+      status = (int)size;
+  }
+  /* for file write
+  else if(get_fd_entry(fd)!=NULL){
+      status = (int) file_write(get_fd_entry(fd)->file,buffer,size);
+  }*/
+return size;
 }
 
-void 
+void
 syscall_seek(int fd UNUSED,unsigned position UNUSED)
 {
   //TODO: to implement
 }
 
 
-unsigned 
+unsigned
 syscall_tell(int fd UNUSED)
 {
   //TODO: to implement
@@ -330,7 +266,7 @@ syscall_tell(int fd UNUSED)
 }
 
 
-void 
+void
 syscall_close(int fd UNUSED)
 {
   //TODO: to implement

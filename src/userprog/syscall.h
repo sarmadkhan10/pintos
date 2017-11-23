@@ -7,14 +7,6 @@
 #include "threads/synch.h"
 #include "user/syscall.h"
 
-//file descriptor object
-struct file_descriptor
-{
-  int descriptor_id;
-  tid_t owner_id;
-  struct file *file;
-  struct list_elem element;
-};
 
 #define SYSCALL_TOTAL 13
 
