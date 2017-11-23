@@ -7,8 +7,11 @@
 #include "threads/synch.h"
 #include "user/syscall.h"
 
-
 #define SYSCALL_TOTAL 13
+
+
+//lock for filesystem
+struct lock filesys_lock;
 
 void syscall_init (void);
 

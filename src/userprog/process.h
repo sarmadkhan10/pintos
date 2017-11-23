@@ -12,10 +12,21 @@ struct process_info
     struct list_elem elem;
   };
 
+
+//for filesystem
+struct process_file {
+  struct file *file;
+  int fd;
+  struct list_elem elem;
+};
+
 void process_init (void);
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_exit (int status);
 void process_activate (void);
+
+//added for filesystem
+struct file* process_get_file (int fd);
 
 #endif /* userprog/process.h */

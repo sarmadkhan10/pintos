@@ -130,7 +130,7 @@ _syscall_write (struct intr_frame *f)
   unsigned size;
   int status;
   int num_bytes;
-
+  //TODO: CHECK VALID ADDRESS
   fd = *((int *)f->esp + 1);
   buffer = *(char **)f->esp + 8;
   size = *((unsigned *)f->esp + 3);
@@ -243,12 +243,24 @@ syscall_write(int fd, const void *buffer,unsigned size)
   if(fd == STDOUT_FILENO){
       putbuf((char *)buffer, (size_t)size);
       status = (int)size;
+  }else{
+
+      //write to file-system
+      lock_acquire(&filesys_lock);
+         struct file *f = process_get_file(fd);
+         if (!f)
+           {
+             //error because file was null
+             lock_release(&filesys_lock);
+             return -1;
+           }
+         int bytes = file_write(f, buffer, size);
+         lock_release(&filesys_lock);
+    return bytes;
   }
-  /* for file write
-  else if(get_fd_entry(fd)!=NULL){
-      status = (int) file_write(get_fd_entry(fd)->file,buffer,size);
-  }*/
-return size;
+
+
+return status;
 }
 
 void
