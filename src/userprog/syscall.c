@@ -7,7 +7,8 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 
-/**====================**/
+/* lock for filesystem. */
+struct lock filesys_lock;
 
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
@@ -23,9 +24,9 @@ is_uaddr_valid (void *uaddr)
   if ((uaddr != NULL) && (is_user_vaddr (uaddr)))
     {
       if (pagedir_get_page (thread_current()->pagedir, uaddr) != NULL)
-	{
-	  valid = true;
-	}
+        {
+          valid = true;
+        }
     }
 
   return valid;
@@ -63,7 +64,7 @@ _syscall_exit (struct intr_frame *f)
 {
   if (is_uaddr_valid (((int *)f->esp) + 1) == false)
     {
-      // kill process and exit
+      thread_exit (-1);
     }
 
   int status = *((int *)(f->esp) + 1);
@@ -128,16 +129,26 @@ _syscall_write (struct intr_frame *f)
   int fd;
   char* buffer;
   unsigned size;
-  int status;
   int num_bytes;
-  //TODO: CHECK VALID ADDRESS
-  fd = *((int *)f->esp + 1);
-  buffer = *(char **)f->esp + 8;
-  size = *((unsigned *)f->esp + 3);
 
-  num_bytes = syscall_write (fd, buffer, size);
+  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
+      (is_uaddr_valid ((char *)f->esp + 8) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 8)) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
+    {
+      thread_exit (-1);
+    }
 
-  f->eax = num_bytes;
+  else
+    {
+      fd = *((int *)f->esp + 1);
+      buffer = *((char **)f->esp + 8);
+      size = *((unsigned *)f->esp + 3);
+
+      num_bytes = syscall_write (fd, buffer, size);
+
+      f->eax = num_bytes;
+    }
 
   return 0;
 

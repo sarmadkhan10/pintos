@@ -79,7 +79,7 @@ tid_t
 process_execute (const char *file_name)
 {
   char *fn_copy;
-  char *program, *args;
+  char *program, *args, *save_ptr;
 
   tid_t tid;
 
@@ -95,9 +95,9 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  program = strtok_r (file_name, " ", &save_ptr);
   /* Create new thread with program name/args */
-  tid = thread_create (fn_copy, PRI_DEFAULT, start_process, fn_copy);
-  printf ("here\n");
+  tid = thread_create (program, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy);
@@ -269,7 +269,7 @@ struct Elf32_Phdr
 #define PF_R 4          /* Readable. */
 
 static bool
-setup_stack (void **esp, char* args[], int* arg_count);
+setup_stack (void **esp, char* args[], int arg_count);
 static bool
 validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool
@@ -282,9 +282,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
  and its initial stack pointer into *ESP.
  Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void
-(**eip) (void),
-      void **esp)
+load (const char *file_name, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -331,56 +329,56 @@ load (const char *file_name, void
       struct Elf32_Phdr phdr;
 
       if (file_ofs < 0 || file_ofs > file_length (file))
-  goto done;
+        goto done;
       file_seek (file, file_ofs);
 
       if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-  goto done;
+        goto done;
       file_ofs += sizeof phdr;
       switch (phdr.p_type)
-  {
-  case PT_NULL:
-  case PT_NOTE:
-  case PT_PHDR:
-  case PT_STACK:
-  default:
-    /* Ignore this segment. */
-    break;
-  case PT_DYNAMIC:
-  case PT_INTERP:
-  case PT_SHLIB:
-    goto done;
-  case PT_LOAD:
-    if (validate_segment (&phdr, file))
       {
-        bool writable = (phdr.p_flags & PF_W) != 0;
-        uint32_t file_page = phdr.p_offset & ~PGMASK;
-        uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
-        uint32_t page_offset = phdr.p_vaddr & PGMASK;
-        uint32_t read_bytes, zero_bytes;
-        if (phdr.p_filesz > 0)
-    {
-      /* Normal segment.
-       Read initial part from disk and zero the rest. */
-      read_bytes = page_offset + phdr.p_filesz;
-      zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE)
-          - read_bytes);
-    }
-        else
-    {
-      /* Entirely zero.
-       Don't read anything from disk. */
-      read_bytes = 0;
-      zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
-    }
-        if (!load_segment (file, file_page, (void *) mem_page, read_bytes,
-         zero_bytes, writable))
-    goto done;
+        case PT_NULL:
+        case PT_NOTE:
+        case PT_PHDR:
+        case PT_STACK:
+        default:
+          /* Ignore this segment. */
+          break;
+        case PT_DYNAMIC:
+        case PT_INTERP:
+        case PT_SHLIB:
+          goto done;
+        case PT_LOAD:
+          if (validate_segment (&phdr, file))
+            {
+              bool writable = (phdr.p_flags & PF_W) != 0;
+              uint32_t file_page = phdr.p_offset & ~PGMASK;
+              uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
+              uint32_t page_offset = phdr.p_vaddr & PGMASK;
+              uint32_t read_bytes, zero_bytes;
+              if (phdr.p_filesz > 0)
+                {
+                  /* Normal segment.
+                   Read initial part from disk and zero the rest. */
+                  read_bytes = page_offset + phdr.p_filesz;
+                  zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE)
+                                        - read_bytes);
+                }
+              else
+                {
+                  /* Entirely zero.
+                   Don't read anything from disk. */
+                  read_bytes = 0;
+                  zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
+                }
+              if (!load_segment (file, file_page, (void *) mem_page, read_bytes,
+                                 zero_bytes, writable))
+                goto done;
+            }
+          else
+            goto done;
+          break;
       }
-    else
-      goto done;
-    break;
-  }
     }
 
   /* Set up stack. */
@@ -511,7 +509,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
 /* Create a minimal stack by mapping a zeroed page at the top of
  user virtual memory. */
 static bool
-setup_stack (void **esp, char* args[], int* arg_count)
+setup_stack (void **esp, char* argv[], int argc)
 {
   uint8_t *kpage;
   bool success = false;
@@ -521,9 +519,36 @@ setup_stack (void **esp, char* args[], int* arg_count)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-  *esp = PHYS_BASE;
+      {
+        *esp = PHYS_BASE;
+
+        int i = argc;
+        // this array holds reference to differences arguments in the stack
+        uint32_t * arr[argc];
+        while(--i >= 0)
+        {
+          *esp = *esp - (strlen(argv[i])+1)*sizeof(char);
+          arr[i] = (uint32_t *)*esp;
+          memcpy(*esp,argv[i],strlen(argv[i])+1);
+        }
+        *esp = *esp - 4;
+        (*(int *)(*esp)) = 0;//sentinel
+        i = argc;
+        while( --i >= 0)
+        {
+          *esp = *esp - 4;//32bit
+          (*(uint32_t **)(*esp)) = arr[i];
+        }
+        *esp = *esp - 4;
+        (*(uintptr_t  **)(*esp)) = (*esp+4);
+        *esp = *esp - 4;
+        *(int *)(*esp) = argc;
+        *esp = *esp - 4;
+        (*(int *)(*esp))=0;
+      }
+
       else
-  palloc_free_page (kpage);
+        palloc_free_page (kpage);
     }
   return success;
 }
