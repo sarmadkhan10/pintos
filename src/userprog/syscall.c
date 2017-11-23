@@ -212,10 +212,18 @@ syscall_remove(const char* file UNUSED)
 
 
 int
-syscall_open(const char* file UNUSED)
+syscall_open(const char* file)
 {
-  //TODO: to implement
-  return 0;
+  lock_acquire(&filesys_lock);
+    struct file *f = filesys_open(file);
+    if (!f)
+      {
+        lock_release(&filesys_lock);
+        return -1;
+      }
+    int fd = process_add_file(f);
+    lock_release(&filesys_lock);
+    return fd;
 }
 
 

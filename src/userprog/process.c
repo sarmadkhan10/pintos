@@ -28,7 +28,10 @@ load (const char *cmdline, void
 //struct list list_thread_children;
 static struct list processes_dead;
 
-//for filesystem
+/*checks for file-system in Thread::file_list
+ * returns NULL if not found
+ * returns file*
+*/
 struct file* process_get_file (int fd)
 {
   struct thread *t = thread_current();
@@ -45,6 +48,24 @@ struct file* process_get_file (int fd)
         }
   return NULL;
 }
+/* adds file to Thread::file_list once it is written
+ * returns -1 if error
+ * else returns fileid
+ */
+int process_add_file (struct file *f)
+{
+  struct process_file *pf = malloc(sizeof(struct process_file));
+  if (!pf)
+    {
+      return -1;
+    }
+  pf->file = f;
+  pf->fd = thread_current()->fd;
+  thread_current()->fd++;
+  list_push_back(&thread_current()->file_list, &pf->elem);
+  return pf->fd;
+}
+
 /* initializes process related data structures. */
 void
 process_init (void)

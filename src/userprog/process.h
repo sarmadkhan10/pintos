@@ -28,5 +28,5 @@ void process_activate (void);
 
 //added for filesystem
 struct file* process_get_file (int fd);
-
+int process_add_file(struct file *f);
 #endif /* userprog/process.h */

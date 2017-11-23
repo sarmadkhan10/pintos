@@ -104,6 +104,7 @@ struct thread
     //tid_t waiting on;                   /* tid of child if wait() is called on it. Otherwise -1 */
     // Needed for file system sys calls
      struct list file_list;
+     int fd;
 #endif
 
     /* Owned by thread.c. */
