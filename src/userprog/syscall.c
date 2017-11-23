@@ -37,6 +37,9 @@ is_uaddr_valid (void *uaddr)
 void
 syscall_init (void)
 {
+  //filesystem lock init
+  lock_init(&filesys_lock);
+
   syscall_table[SYS_HALT] = _syscall_halt;
   syscall_table[SYS_EXIT] = _syscall_exit;
   syscall_table[SYS_EXEC] = _syscall_exec;
@@ -262,10 +265,32 @@ syscall_filesize(int fd)
 
 
 int
-syscall_read(int fd UNUSED,void* buffer UNUSED, unsigned size UNUSED)
+syscall_read(int fd,void* buffer, unsigned size)
 {
-  //TODO: to implement
-  return 0;
+  if(fd == STDIN_FILENO)
+    {
+       unsigned i;
+       uint8_t* temp_buffer = (uint8_t*)buffer;
+       for(i=0;i<size;i++)
+         {
+           temp_buffer[i] = input_getc();
+         }
+       return size;
+    }else
+      {
+        lock_acquire(&filesys_lock);
+        struct file *f = process_get_file(fd);
+        if(!f)
+          {
+            lock_release(&filesys_lock);
+            return -1;
+          }
+
+          int bytes = file_read(f, buffer, size);
+          lock_release(&filesys_lock);
+          return bytes;
+      }
+
 }
 
 
