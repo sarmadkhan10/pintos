@@ -20,10 +20,8 @@
 #include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
-static bool
-load (const char *cmdline, void
-(**eip) (void),
-      void **esp);
+static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void get_process_args (char *cmd, char** args, int *arg_count);
 
 //struct list list_thread_children;
 static struct list processes_dead;
