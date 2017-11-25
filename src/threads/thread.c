@@ -206,6 +206,11 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  t->parent_tid = thread_current ()->tid;
+  sema_init (&t->sema, 0);
+
+  t->sema_parent = &thread_current ()->sema;
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -654,6 +659,20 @@ thread_check_and_awake_asleep_threads(void)
 }
 
 #ifdef USERPROG
+/* returns true if the calling thread is parent of tid */
+bool is_current_thread_parent_of (tid_t tid)
+{
+  bool ret_val;
+  struct thread *t = thread_retrieve (tid);
+
+  if(t == NULL || t->parent_tid != thread_tid ())
+    ret_val = false;
+  else
+    ret_val = true;
+
+  return ret_val;
+}
+
 /* Get thread pointer using its tid. Returns NULL if not found. */
 struct thread *
 thread_retrieve (tid_t tid)

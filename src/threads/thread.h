@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -97,14 +98,16 @@ struct thread
 
     int64_t ticks_sleep;                /* Ticks the threads will sleep for. */
 
+    tid_t parent_tid;                   /* process's parent tid */
+    struct semaphore sema;              /* for exit and wait syscalls */
+    //struct list children;               /* list of direct children (tids) */
+    struct semaphore *sema_parent;      /* pointer to parent process's sema (hackish) */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    tid_t parent_tid;                   /* process's parent tid */
-    //tid_t waiting on;                   /* tid of child if wait() is called on it. Otherwise -1 */
-    // Needed for file system sys calls
-     struct list file_list;
-     int fd;
+    struct list file_list;              /* filesys syscalls */
+    int fd;                             /* filesys syscalls */
 #endif
 
     /* Owned by thread.c. */
@@ -154,6 +157,7 @@ void thread_add_to_asleep_list (struct thread *t);
 void thread_check_and_awake_asleep_threads (void);
 
 #ifdef USERPROG
+bool is_current_thread_parent_of (tid_t tid);
 struct thread * thread_retrieve (tid_t tid);
 #endif /* USERPROG */
 

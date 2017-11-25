@@ -7,18 +7,25 @@
 struct process_info
   {
     tid_t tid;          /* tid of the process */
-    tid_t parent_tid;
+    tid_t parent_tid;   /* tid of parent process */
     int status_code;    /* set by exit () syscall */
     struct list_elem elem;
   };
 
+struct process_wait_info
+  {
+    struct semaphore sema;
+    tid_t waiting_for_tid;
+    struct list_elem elem;
+  };
 
-//for filesystem
-struct process_file {
-  struct file *file;
-  int fd;
-  struct list_elem elem;
-};
+/* for filesystem */
+struct process_file
+  {
+    struct file *file;
+    int fd;
+    struct list_elem elem;
+  };
 
 void process_init (void);
 tid_t process_execute (const char *file_name);
