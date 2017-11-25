@@ -209,16 +209,13 @@ _syscall_write (struct intr_frame *f)
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
       (is_uaddr_valid (*((char **) ((char *)f->esp + 8))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
-    {
-      //printf ("0x%08x\n", *((char **)f->esp + 8));
       thread_exit (-1);
-    }
 
-    fd = *((int *)f->esp + 1);
-    buffer = *((char **) ((char *)f->esp + 8));
-    size = *((unsigned *)f->esp + 3);
+  fd = *((int *)f->esp + 1);
+  buffer = *((char **) ((char *)f->esp + 8));
+  size = *((unsigned *)f->esp + 3);
 
-    f->eax = syscall_write (fd, buffer, size);
+  f->eax = syscall_write (fd, buffer, size);
 
   return 0;
 }
@@ -283,6 +280,7 @@ syscall_halt(void)
 void
 syscall_exit (int status)
 {
+  printf ("%s: exit(%d)\n", thread_current ()->name, status);
   thread_exit (status);
 }
 
