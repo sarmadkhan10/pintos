@@ -87,10 +87,10 @@ _syscall_exec (struct intr_frame *f)
   const char *cmd_line;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
     thread_exit (-1);
 
-  cmd_line = *((char **)f->esp + 4);
+  cmd_line = *((char **) ((char *)f->esp + 4));
 
   f->eax = syscall_open (cmd_line);
 
@@ -117,12 +117,12 @@ _syscall_create (struct intr_frame *f)
   unsigned initial_size;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 4)) == false) ||
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false) ||
       (is_uaddr_valid ((int *)f->esp + 2) == false))
     thread_exit (-1);
 
-  file = *((char **)f->esp + 4);
-  initial_size = *((int *)f->esp + 8);
+  file = *((char **) ((char *)f->esp + 4));
+  initial_size = *((int *)f->esp + 2);
 
   f->eax = syscall_create (file, initial_size);
 
@@ -135,10 +135,10 @@ _syscall_remove (struct intr_frame *f)
   const char *file;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
     thread_exit (-1);
 
-  file = *((char **)f->esp + 4);
+  file = *((char **) ((char *)f->esp + 4));
 
   f->eax = syscall_remove (file);
 
@@ -151,10 +151,10 @@ _syscall_open (struct intr_frame *f)
   const char *file;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
     thread_exit (-1);
 
-  file = *((char **)f->esp + 4);
+  file = *((char **) ((char *)f->esp + 4));
 
   f->eax = syscall_open (file);
 
@@ -166,10 +166,10 @@ _syscall_filesize (struct intr_frame *f)
 {
   int fd;
 
-  if (is_uaddr_valid ((int *)f->esp + 2) == false)
+  if (is_uaddr_valid ((int *)f->esp + 1) == false)
     thread_exit (-1);
 
-  fd = *((int *)f->esp + 2);
+  fd = *((int *)f->esp + 1);
 
   f->eax = syscall_filesize (fd);
 
@@ -185,12 +185,12 @@ _syscall_read (struct intr_frame *f)
 
   if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 8)) == false) ||
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 8))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
     thread_exit (-1);
 
   fd = *((int *)f->esp + 1);
-  buffer = *((char **)f->esp + 8);
+  buffer = *((char **) ((char *)f->esp + 8));
   size = *((unsigned *)f->esp + 3);
 
   f->eax = syscall_read (fd, buffer, size);
@@ -207,26 +207,20 @@ _syscall_write (struct intr_frame *f)
 
   if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 8)) == false) ||
+      (is_uaddr_valid (*((char **) ((char *)f->esp + 8))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
     {
-      thread_exit (-1);
       //printf ("0x%08x\n", *((char **)f->esp + 8));
-      //printf ("0x%08x\n", PHYS_BASE);
-      //return -1;
+      thread_exit (-1);
     }
 
-  else
-    {
-      fd = *((int *)f->esp + 1);
-      buffer = *((char **)f->esp + 8);
-      size = *((unsigned *)f->esp + 3);
+    fd = *((int *)f->esp + 1);
+    buffer = *((char **) ((char *)f->esp + 8));
+    size = *((unsigned *)f->esp + 3);
 
-      f->eax = syscall_write (fd, buffer, size);
-    }
+    f->eax = syscall_write (fd, buffer, size);
 
   return 0;
-
 }
 
 
@@ -469,12 +463,10 @@ syscall_close(int fd UNUSED)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  //printf ("system call!\n");
-  //thread_exit ();
 
-  if (is_uaddr_valid (f) == false)
+  if (is_uaddr_valid (f->esp) == false)
     {
-      // exit and kill process
+      thread_exit (-1);
     }
 
   /* get the syscall no. from the stack. */

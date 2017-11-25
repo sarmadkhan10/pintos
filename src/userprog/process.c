@@ -80,12 +80,9 @@ tid_t
 process_execute (const char *file_name)
 {
   char *fn_copy;
-  char *program, *args, *save_ptr;
+  char *save_ptr;
 
   tid_t tid;
-
-  struct thread *t_new;
-  struct thread_child *t_child;
 
   /* Make a copy of FILE_NAME.
    Otherwise there's a race between the caller and load(). */
@@ -123,7 +120,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success)
-    thread_exit (0);
+    thread_exit (-1);
 
   /* Start the user process by simulating a return from an
    interrupt, implemented by intr_exit (in
@@ -340,7 +337,7 @@ struct Elf32_Phdr
 #define PF_R 4          /* Readable. */
 
 static bool
-setup_stack (void **esp, char* args[], int arg_count);
+setup_stack (void **esp, char *args[], int arg_count);
 static bool
 validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool
@@ -361,9 +358,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-  char *file_name_only;
-  char *save_ptr;
-  char *args[5];                        /* max: 10 */
+  char *args[30];                        /* max: 10 */
   int arg_count;
   //char fn_copy[50];
 
@@ -457,8 +452,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
 
   /* Start address. */
-  *eip = (void
-  (*) (void)) ehdr.e_entry;
+  *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
@@ -580,7 +574,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
 /* Create a minimal stack by mapping a zeroed page at the top of
  user virtual memory. */
 static bool
-setup_stack (void **esp, char* argv[], int argc)
+setup_stack (void **esp, char *argv[], int argc)
 {
   uint8_t *kpage;
   bool success = false;

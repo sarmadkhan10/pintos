@@ -99,9 +99,9 @@ struct thread
     int64_t ticks_sleep;                /* Ticks the threads will sleep for. */
 
     tid_t parent_tid;                   /* process's parent tid */
-    struct semaphore sema;              /* for exit and wait syscalls */
+    //struct semaphore sema;              /* for exit and wait syscalls */
     //struct list children;               /* list of direct children (tids) */
-    struct semaphore *sema_parent;      /* pointer to parent process's sema (hackish) */
+    //struct semaphore *sema_parent;      /* pointer to parent process's sema (hackish) */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -207,9 +207,10 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   t->parent_tid = thread_current ()->tid;
-  sema_init (&t->sema, 0);
 
-  t->sema_parent = &thread_current ()->sema;
+#ifdef USERPROG
+  list_init (&t->file_list);
+#endif /* USERPROG */
 
   /* Add to run queue. */
   thread_unblock (t);
