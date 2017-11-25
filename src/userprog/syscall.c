@@ -7,6 +7,9 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "devices/shutdown.h"
+#include "devices/input.h"
 
 /* lock for filesystem. */
 struct lock filesys_lock;
@@ -37,8 +40,7 @@ is_uaddr_valid (void *uaddr)
 void
 syscall_init (void)
 {
-  //filesystem lock init
-  lock_init(&filesys_lock);
+  lock_init (&filesys_lock);
 
   syscall_table[SYS_HALT] = _syscall_halt;
   syscall_table[SYS_EXIT] = _syscall_exit;
@@ -59,7 +61,8 @@ syscall_init (void)
 int
 _syscall_halt (struct intr_frame *f UNUSED)
 {
-  //TODO: to implement
+  syscall_halt ();
+
   return 0;
 }
 
@@ -86,44 +89,102 @@ _syscall_exec (struct intr_frame *f UNUSED)
 }
 
 int
-_syscall_wait ( struct intr_frame *f UNUSED)
+_syscall_wait (struct intr_frame *f)
 {
-  //TODO: to implement
+  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+    thread_exit (-1);
+
+  int pid = *((int *)f->esp + 1);
+
+  f->eax = syscall_wait (pid);
+
   return 0;
 }
 
 int
-_syscall_create (struct intr_frame *f UNUSED)
+_syscall_create (struct intr_frame *f)
 {
-  //TODO: to implement
-    return false;
-}
+  const char *file;
+  unsigned initial_size;
 
-int
-_syscall_remove (struct intr_frame *f UNUSED)
-{
-  //TODO: to implement
-  return false;
-}
+  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 4)) == false) ||
+      (is_uaddr_valid ((int *)f->esp + 2) == false))
+    thread_exit (-1);
 
-int
-_syscall_open (struct intr_frame *f UNUSED)
-{
-  //TODO: to implement
+  file = *((char **)f->esp + 4);
+  initial_size = *((int *)f->esp + 8);
+
+  f->eax = syscall_create (file, initial_size);
+
   return 0;
 }
 
 int
-_syscall_filesize (struct intr_frame *f UNUSED)
+_syscall_remove (struct intr_frame *f)
 {
-  //TODO: to implement
+  const char *file;
+
+  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
+    thread_exit (-1);
+
+  file = *((char **)f->esp + 4);
+
+  f->eax = syscall_remove (file);
+
   return 0;
 }
 
 int
-_syscall_read (struct intr_frame *f UNUSED)
+_syscall_open (struct intr_frame *f)
 {
-  //TODO: to implement
+  const char *file;
+
+  if (is_uaddr_valid (*((char **)f->esp + 4)) == false)
+    thread_exit (-1);
+
+  file = *((char **)f->esp + 4);
+
+  f->eax = syscall_open (file);
+
+  return 0;
+}
+
+int
+_syscall_filesize (struct intr_frame *f)
+{
+  int fd;
+
+  if (is_uaddr_valid ((int *)f->esp + 2) == false)
+    thread_exit (-1);
+
+  fd = *((int *)f->esp + 2);
+
+  f->eax = syscall_filesize (fd);
+
+  return 0;
+}
+
+int
+_syscall_read (struct intr_frame *f)
+{
+  int fd;
+  char *buffer;
+  unsigned size;
+
+  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
+      (is_uaddr_valid ((char *)f->esp + 8) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 8)) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
+    thread_exit (-1);
+
+  fd = *((int *)f->esp + 1);
+  buffer = *((char **)f->esp + 8);
+  size = *((unsigned *)f->esp + 3);
+
+  f->eax = syscall_read (fd, buffer, size);
+
   return 0;
 }
 
@@ -133,7 +194,6 @@ _syscall_write (struct intr_frame *f)
   int fd;
   char* buffer;
   unsigned size;
-  int num_bytes;
 
   if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
@@ -152,33 +212,59 @@ _syscall_write (struct intr_frame *f)
       buffer = *((char **)f->esp + 8);
       size = *((unsigned *)f->esp + 3);
 
-      num_bytes = syscall_write (fd, buffer, size);
-
-      f->eax = num_bytes;
+      f->eax = syscall_write (fd, buffer, size);
     }
 
   return 0;
 
 }
 
+
 int
-_syscall_seek (struct intr_frame *f UNUSED)
+_syscall_seek (struct intr_frame *f)
 {
-  //TODO: to implement
+  int fd;
+  unsigned position;
+
+  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 2) == false))
+    thread_exit (-1);
+
+  fd = *((int *)f->esp + 1);
+  position = *((unsigned *)f->esp + 2);
+
+  syscall_seek (fd, position);
+
   return 0;
 }
 
 int
-_syscall_tell (struct intr_frame *f UNUSED)
+_syscall_tell (struct intr_frame *f)
 {
-  //TODO: to implement
+  int fd;
+
+  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+    thread_exit (-1);
+
+  fd = *((int *)f->esp + 1);
+
+  f->eax = syscall_tell (fd);
+
   return 0;
 }
 
 int
-_syscall_close(struct intr_frame *f UNUSED)
+_syscall_close(struct intr_frame *f)
 {
-  //TODO: to implement
+  int fd;
+
+  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+    thread_exit (-1);
+
+  fd = *((int *)f->esp + 1);
+
+  syscall_close (fd);
+
   return 0;
 }
 
@@ -208,12 +294,12 @@ syscall_exec(const char* cmd_line UNUSED)
 int
 syscall_wait(pid_t pid)
 {
-  return process_wait(pid);
+  return process_wait (pid);
 }
 
 
 bool
-syscall_create(const char* file,unsigned initial_size)
+syscall_create(const char* file, unsigned initial_size)
 {
   bool success=false;
   lock_acquire(&filesys_lock);
@@ -268,31 +354,32 @@ syscall_filesize(int fd)
 
 
 int
-syscall_read(int fd,void* buffer, unsigned size)
+syscall_read (int fd, void *buffer, unsigned size)
 {
   if(fd == STDIN_FILENO)
     {
-       unsigned i;
-       uint8_t* temp_buffer = (uint8_t*)buffer;
-       for(i=0;i<size;i++)
-         {
-           temp_buffer[i] = input_getc();
-         }
-       return size;
-    }else
-      {
-        lock_acquire(&filesys_lock);
-        struct file *f = process_get_file(fd);
-        if(!f)
-          {
-            lock_release(&filesys_lock);
-            return -1;
-          }
-
-          int bytes = file_read(f, buffer, size);
+      unsigned i;
+      uint8_t* temp_buffer = (uint8_t*)buffer;
+      for(i=0;i<size;i++)
+        {
+          temp_buffer[i] = input_getc();
+        }
+      return size;
+    }
+  else
+    {
+      lock_acquire(&filesys_lock);
+      struct file *f = process_get_file(fd);
+      if(!f)
+        {
           lock_release(&filesys_lock);
-          return bytes;
-      }
+          return -1;
+        }
+
+      int bytes = file_read(f, buffer, size);
+      lock_release(&filesys_lock);
+      return bytes;
+    }
 
 }
 
