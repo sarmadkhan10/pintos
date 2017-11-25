@@ -82,9 +82,18 @@ _syscall_exit (struct intr_frame *f)
 }
 
 int
-_syscall_exec (struct intr_frame *f UNUSED)
+_syscall_exec (struct intr_frame *f)
 {
-  //TODO: to implement
+  const char *cmd_line;
+
+  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
+    thread_exit (-1);
+
+  cmd_line = *((char **)f->esp + 4);
+
+  f->eax = syscall_open (cmd_line);
+
   return 0;
 }
 
@@ -141,7 +150,8 @@ _syscall_open (struct intr_frame *f)
 {
   const char *file;
 
-  if (is_uaddr_valid (*((char **)f->esp + 4)) == false)
+  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 4)) == false))
     thread_exit (-1);
 
   file = *((char **)f->esp + 4);
