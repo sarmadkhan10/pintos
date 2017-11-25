@@ -135,15 +135,15 @@ _syscall_write (struct intr_frame *f)
   unsigned size;
   int num_bytes;
 
-  if (//(is_uaddr_valid ((int *)f->esp + 1) == false) ||
-      //(is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_uaddr_valid (*((char **)f->esp + 8)) == false))// ||
-      //(is_uaddr_valid ((unsigned *)f->esp + 3) == false))
+  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
+      (is_uaddr_valid ((char *)f->esp + 8) == false) ||
+      (is_uaddr_valid (*((char **)f->esp + 8)) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
     {
-      //thread_exit (-1);
-      printf ("0x%08x\n", *((char **)f->esp + 8));
-      printf ("0x%08x\n", PHYS_BASE);
-      return -1;
+      thread_exit (-1);
+      //printf ("0x%08x\n", *((char **)f->esp + 8));
+      //printf ("0x%08x\n", PHYS_BASE);
+      //return -1;
     }
 
   else
