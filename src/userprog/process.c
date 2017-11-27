@@ -25,6 +25,7 @@ static void get_process_args (char *cmd, char** args, int *arg_count);
 
 static struct list processes_dead;
 static struct list processes_waiting;
+static struct list processes_load_waiting;
 
 /*checks for file-system in Thread::file_list
  * returns NULL if not found
@@ -70,6 +71,7 @@ process_init (void)
 {
   list_init (&processes_dead);
   list_init (&processes_waiting);
+  list_init (&processes_load_waiting);
 }
 
 /* Starts a new thread running a user program loaded from
@@ -81,6 +83,7 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   char *save_ptr;
+  char *program;
 
   tid_t tid;
 
@@ -91,13 +94,27 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  file_name = strtok_r (file_name, " ", &save_ptr);
+  program = strtok_r ((char *) file_name, " ", &save_ptr);
+
+  struct process_load_info *p_load = malloc (sizeof (struct process_load_info));
+  p_load->parent_tid = thread_current ()->tid;
+  sema_init (&p_load->sema, 0);
+  list_push_back (&processes_load_waiting, &p_load->elem);
+
   /* Create new thread with program name/args */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (program, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy);
     }
+
+  sema_down (&p_load->sema);
+
+  /* remove from list and free mem */
+  list_remove (&p_load->elem);
+
+  free (p_load);
+
   return tid;
 }
 
@@ -109,6 +126,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  struct list_elem *e;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -116,6 +134,18 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+
+  for (e = list_begin (&processes_load_waiting); e != list_end (&processes_load_waiting);
+      e = list_next (e))
+    {
+        struct process_load_info *p_load = list_entry (e, struct process_load_info, elem);
+
+        /* signal parent */
+        if (p_load->parent_tid == thread_current ()->parent_tid)
+          sema_up (&p_load->sema);
+
+        break;
+    }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -174,16 +204,37 @@ process_wait (tid_t child_tid)
   /* but first check if parent is alive? */
   struct process_wait_info *p_wait = malloc (sizeof (struct process_wait_info));
 
-  sema_init(&p_wait->sema, 0);
+  sema_init (&p_wait->sema, 0);
   p_wait->waiting_for_tid = child_tid;
 
   /* add to waiting processes list */
-  list_push_back(&processes_waiting, &p_wait->elem);
+  list_push_back (&processes_waiting, &p_wait->elem);
 
   /* wait */
   sema_down(&p_wait->sema);
 
-  return -1;
+  /* when control reaches here, the child has been added to dead processes list */
+
+  /* deallocate the resources */
+  free(p_wait);
+
+  for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
+        e = list_next (e))
+    {
+      struct process_info *p = list_entry (e, struct process_info, elem);
+
+      if ((cur->tid == p->parent_tid) && (child_tid == p->tid))
+        {
+          ret_val = p->status_code;
+
+          /* set to -1 so that if wait is called again, -1 is returned */
+          p->status_code = -1;
+
+          return ret_val;
+        }
+    }
+
+  NOT_REACHED ();
 }
 
 /* Free the current process's resources. */
@@ -195,17 +246,30 @@ process_exit (int status)
   struct list_elem *e;
 
   /* remove child processes from processes_dead */
-  for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
-      e = list_next (e))
+  //for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
+      //e = list_next (e))
+  e = list_begin (&processes_dead);
+  bool del = false;
+  while (true)
     {
+      if (e == list_end (&processes_dead))
+        break;
+
       struct process_info *p = list_entry (e, struct process_info, elem);
 
       if (cur->tid == p->parent_tid)
         {
-          (void *) list_remove (&p->elem);
+          e = list_remove (&p->elem);
 
           free (p);
+
+          del = true;
         }
+
+      if (del != true)
+        e = list_next (e);
+      else
+        del = false;
     }
 
   /* add current process to processes_dead list */
@@ -216,6 +280,25 @@ process_exit (int status)
   p_info->status_code = status;
 
   list_push_back (&processes_dead, &p_info->elem);
+
+  /* if the parent process is waiting for current process, unblock it */
+  for (e = list_begin (&processes_waiting); e != list_end (&processes_waiting);
+      e = list_next (e))
+    {
+      struct process_wait_info *p_wait = list_entry (e, struct process_wait_info, elem);
+
+      /* if indeed the parent is waiting */
+      if (p_wait->waiting_for_tid == thread_tid ())
+        {
+          /*remove from waiting list */
+          list_remove(e);
+
+          /* unblock parent */
+          sema_up (&p_wait->sema);
+
+          break;
+        }
+    }
 
   /* Destroy the current process's page directory and switch back
    to the kernel-only page directory. */
@@ -232,28 +315,6 @@ process_exit (int status)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-    }
-
-  /* if the parent process is waiting for current process, unblock it */
-  for (e = list_begin (&processes_waiting); e != list_end (&processes_waiting);
-      e = list_next (e))
-    {
-
-      struct process_wait_info *p_wait = list_entry (e, struct process_wait_info, elem);
-
-      /* if indeed the parent is waiting */
-      if (p_wait->waiting_for_tid == thread_tid ())
-        {
-          sema_up (&p_wait->sema);
-
-          /*remove from waiting list */
-          list_remove(e);
-
-          /* deallocate the resources */
-          free(p_wait);
-
-          break;
-        }
     }
 }
 

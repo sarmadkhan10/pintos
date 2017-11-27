@@ -19,6 +19,13 @@ struct process_wait_info
     struct list_elem elem;
   };
 
+struct process_load_info
+  {
+    tid_t parent_tid;
+    struct semaphore sema;
+    struct list_elem elem;
+  };
+
 /* for filesystem */
 struct process_file
   {
