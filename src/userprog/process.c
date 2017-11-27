@@ -31,10 +31,8 @@ static struct lock processes_dead_lock;
 static struct lock processes_waiting_lock;
 static struct lock processes_load_waiting_lock;
 
-/*checks for file-system in Thread::file_list
- * returns NULL if not found
- * returns file*
-*/
+/* returns the file corresponding to file descriptor fd
+   of the current thread or NULL if not found */
 struct file* process_get_file (int fd)
 {
   struct thread *t = thread_current();
@@ -52,10 +50,8 @@ struct file* process_get_file (int fd)
 
   return NULL;
 }
-/* adds file to Thread::file_list once it is written
- * returns -1 if error
- * else returns fileid
- */
+
+/* adds the file to the file_list of the current thread */
 int process_add_file (struct file *f)
 {
   struct process_file *pf = malloc(sizeof(struct process_file));
@@ -123,6 +119,7 @@ process_execute (const char *file_name)
       palloc_free_page (fn_copy);
     }
 
+  /* wait for the child process to load */
   sema_down (&p_load->sema);
   /* save the value of loaded i.e. the exe load status */
   loaded = p_load->loaded;
@@ -132,6 +129,7 @@ process_execute (const char *file_name)
 
   free (p_load);
 
+  /* if load unsuccessful */
   if (loaded == false)
     tid = TID_ERROR;
 
@@ -155,6 +153,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  /* update the load status and unblock the parent process */
   lock_acquire (&processes_load_waiting_lock);
   for (e = list_begin (&processes_load_waiting); e != list_end (&processes_load_waiting);
       e = list_next (e))
@@ -204,6 +203,7 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   int ret_val;
 
+  /* check the dead processes first. maybe the child process is already dead */
   lock_acquire (&processes_dead_lock);
   for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
       e = list_next (e))
@@ -250,6 +250,7 @@ process_wait (tid_t child_tid)
   /* deallocate the resources */
   free(p_wait);
 
+  /* check the dead processes list again */
   lock_acquire (&processes_dead_lock);
   for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
         e = list_next (e))
@@ -286,7 +287,9 @@ process_exit (int status)
       file_close(cur->exec);
     }
 
-  /* remove child processes from processes_dead */
+  /* remove the current thread's child processes from processes_dead list since
+     we maintain this list for exit status only. once the parent is dead, the children
+     can be removed */
   lock_acquire (&processes_dead_lock);
   e = list_begin (&processes_dead);
   bool del = false;
@@ -323,7 +326,7 @@ process_exit (int status)
   lock_release (&processes_dead_lock);
 
   lock_acquire (&processes_waiting_lock);
-  /* if the parent process is waiting for current process, unblock it */
+  /* if the parent process is waiting for current process (exit status), unblock it */
   for (e = list_begin (&processes_waiting); e != list_end (&processes_waiting);
       e = list_next (e))
     {
@@ -692,31 +695,38 @@ setup_stack (void **esp, char *argv[], int argc)
       {
         *esp = PHYS_BASE;
 
-        int i = argc;
-        // this array holds reference to differences arguments in the stack
-        uint32_t * arr[argc];
-        while(--i >= 0)
-        {
-          *esp = *esp - (strlen(argv[i])+1)*sizeof(char);
-          arr[i] = (uint32_t *)*esp;
-          memcpy(*esp,argv[i],strlen(argv[i])+1);
-        }
+        int counter = argc;
+
+        /* this array stores references to arguments in the stack */
+        uint32_t * pointer_to_args[argc];
+
+        while (--counter >= 0)
+          {
+            *esp = *esp - (strlen (argv[counter]) + 1) * sizeof (char);
+            pointer_to_args[counter] = (uint32_t *) *esp;
+            memcpy(*esp, argv[counter], strlen (argv[counter]) + 1);
+          }
+
         *esp = *esp - 4;
-        (*(int *)(*esp)) = 0;//sentinel
-        i = argc;
-        while( --i >= 0)
-        {
-          *esp = *esp - 4;//32bit
-          (*(uint32_t **)(*esp)) = arr[i];
-        }
+        (*(int *)(*esp)) = 0;
+
+        counter = argc;
+
+        while(--counter >= 0)
+          {
+            *esp = *esp - 4;
+            (*(uint32_t **)(*esp)) = pointer_to_args[counter];
+          }
+
         *esp = *esp - 4;
         (*(uintptr_t  **)(*esp)) = (*esp+4);
+
         *esp = *esp - 4;
         *(int *)(*esp) = argc;
-        *esp = *esp - 4;
-        (*(int *)(*esp))=0;
-      }
 
+        *esp = *esp - 4;
+        (*(int *) (*esp)) = 0;
+      }
       else
         palloc_free_page (kpage);
     }
@@ -743,7 +753,7 @@ install_page (void *upage, void *kpage, bool writable)
       && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-/* get the process args + the number of args */
+/* get the process args + the number of args from cmd */
 static void
 get_process_args (char *cmd, char** args, int *arg_count)
 {
@@ -762,7 +772,7 @@ get_process_args (char *cmd, char** args, int *arg_count)
     }
 }
 
-
+/* removes file descriptor fd from the file_list of the current thread */
 void process_close_file (int fd)
 {
   struct thread *t = thread_current();
@@ -785,6 +795,3 @@ void process_close_file (int fd)
       e = next;
     }
 }
-
-
-

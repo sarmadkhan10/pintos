@@ -15,14 +15,14 @@ struct process_info
 struct process_wait_info
   {
     struct semaphore sema;
-    tid_t waiting_for_tid;
+    tid_t waiting_for_tid;   /* tid of process the parent process is waiting for */
     struct list_elem elem;
   };
 
 struct process_load_info
   {
-    tid_t parent_tid;
-    bool loaded;
+    tid_t parent_tid;       /* tid of the parent process */
+    bool loaded;            /* the load status of the process if it loaded successfully or not */
     struct semaphore sema;
     struct list_elem elem;
   };
@@ -41,7 +41,7 @@ int process_wait (tid_t);
 void process_exit (int status);
 void process_activate (void);
 
-//added for filesystem
+/* for filesystem */
 struct file* process_get_file (int fd);
 int process_add_file(struct file *f);
 void process_close_file (int fd);

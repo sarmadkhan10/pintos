@@ -98,17 +98,15 @@ struct thread
 
     int64_t ticks_sleep;                /* Ticks the threads will sleep for. */
 
-    tid_t parent_tid;                   /* process's parent tid */
-    //struct semaphore sema;              /* for exit and wait syscalls */
-    //struct list children;               /* list of direct children (tids) */
-    //struct semaphore *sema_parent;      /* pointer to parent process's sema (hackish) */
+    tid_t parent_tid;                   /* thread's parent tid */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct list file_list;              /* filesys syscalls */
-    int fd;                             /* filesys syscalls */
-    struct file* exec;
+    struct list file_list;              /* stores the list of files opened by the process */
+    int fd;                             /* the file descriptor assigned to newly opened file.
+                                           gets incremented every time */
+    struct file *exec;                  /* the process executable file */
 #endif
 
     /* Owned by thread.c. */
