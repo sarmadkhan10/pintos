@@ -248,6 +248,14 @@ process_exit (int status)
   uint32_t *pd;
   struct list_elem *e;
 
+  // Close all files opened by process
+    lock_acquire(&filesys_lock);
+    process_close_file(-1);
+    if (cur->exec)
+      {
+        file_close(cur->exec);
+      }
+    lock_release(&filesys_lock);
   /* remove child processes from processes_dead */
   //for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
       //e = list_next (e))
@@ -302,6 +310,7 @@ process_exit (int status)
           break;
         }
     }
+
 
   /* Destroy the current process's page directory and switch back
    to the kernel-only page directory. */
@@ -435,12 +444,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   get_process_args ((char *) file_name, args, &arg_count);
 
   /* Open executable file. */
-  file = filesys_open ((const char *) args[0]);
-  if (file == NULL)
-    {
-      printf ("load: %s: open failed\n", args[0]);
-      goto done;
-    }
+    lock_acquire(&filesys_lock);
+    file = filesys_open ((const char *) args[0]);
+       if (file == NULL)
+      {
+        printf ("load: %s: open failed\n", file_name);
+        goto done;
+      }
+    file_deny_write(file);
+    t->exec = file;
+
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -522,7 +535,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  lock_release(&filesys_lock);
   return success;
 }
 
@@ -720,3 +733,30 @@ get_process_args (char *cmd, char** args, int *arg_count)
       *arg_count += 1;
     }
 }
+
+
+void process_close_file (int fd)
+{
+  struct thread *t = thread_current();
+  struct list_elem *next, *e = list_begin(&t->file_list);
+
+  while (e != list_end (&t->file_list))
+    {
+      next = list_next(e);
+      struct process_file *pf = list_entry (e, struct process_file, elem);
+      if (fd == pf->fd || fd == -1)
+        {
+          file_close(pf->file);
+          list_remove(&pf->elem);
+          free(pf);
+          if (fd != -1)
+            {
+              return;
+            }
+        }
+      e = next;
+    }
+}
+
+
+

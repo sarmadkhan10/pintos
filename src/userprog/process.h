@@ -43,4 +43,5 @@ void process_activate (void);
 //added for filesystem
 struct file* process_get_file (int fd);
 int process_add_file(struct file *f);
+void process_close_file (int fd);
 #endif /* userprog/process.h */

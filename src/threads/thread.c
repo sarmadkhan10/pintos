@@ -211,6 +211,7 @@ thread_create (const char *name, int priority,
 #ifdef USERPROG
   list_init (&t->file_list);
   t->fd = 2;
+  t->exec=NULL;
 #endif /* USERPROG */
 
   /* Add to run queue. */

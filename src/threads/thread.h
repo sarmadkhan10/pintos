@@ -108,6 +108,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct list file_list;              /* filesys syscalls */
     int fd;                             /* filesys syscalls */
+    struct file* exec;
 #endif
 
     /* Owned by thread.c. */

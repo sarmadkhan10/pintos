@@ -11,8 +11,6 @@
 #include "devices/shutdown.h"
 #include "devices/input.h"
 
-/* lock for filesystem. */
-struct lock filesys_lock;
 
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
@@ -451,9 +449,11 @@ syscall_tell(int fd)
 
 
 void
-syscall_close(int fd UNUSED)
+syscall_close(int fd)
 {
-  //TODO: to implement
+  lock_acquire(&filesys_lock);
+  process_close_file(fd);
+  lock_release(&filesys_lock);
 }
 
 
