@@ -12,6 +12,9 @@
 #include "devices/input.h"
 
 
+/* lock for filesystem. */
+struct lock filesys_lock;
+
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
 

@@ -27,6 +27,9 @@ static struct list processes_dead;
 static struct list processes_waiting;
 static struct list processes_load_waiting;
 
+/* declared in syscall.c */
+extern struct lock filesys_lock;
+
 /*checks for file-system in Thread::file_list
  * returns NULL if not found
  * returns file*
@@ -248,7 +251,7 @@ process_exit (int status)
   uint32_t *pd;
   struct list_elem *e;
 
-  // Close all files opened by process
+  /* Close all files opened by process */
     lock_acquire(&filesys_lock);
     process_close_file(-1);
     if (cur->exec)
