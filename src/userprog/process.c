@@ -448,7 +448,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     file = filesys_open ((const char *) args[0]);
        if (file == NULL)
       {
-        printf ("load: %s: open failed\n", file_name);
+        printf ("load: %s: open failed\n",  args[0]);
         goto done;
       }
     file_deny_write(file);
