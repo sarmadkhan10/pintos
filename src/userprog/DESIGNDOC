@@ -8,8 +8,7 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Hamza Anwar <s8haanwa@stud.uni-saarland.de>
 FirstName LastName <email@domain.example>
 
 ---- PRELIMINARIES ----
@@ -30,6 +29,16 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+No new global variables or types were declared for argument
+passing. 
+
+We only changed the following declarations:
+
+	1. static bool setup_stack (void **esp, char *argv[], int argc)
+
+This was done mainly because to pass the arguments seperately then pushed
+to the stack accordingly
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
@@ -40,9 +49,27 @@ FirstName LastName <email@domain.example>
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
+In strtok() the token pointer is static and kept internally by the function
+where as in strtok_r() the pointer is passed for getting the next token
+which means if we use strtok() in the kernel there exists a  possible data race where 
+one thread would use the last token held by another thread which is incorrect and will crash
+the kernel
+
+
+
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
+1. The arguments  will be validated  passing the control to kernel therefore so
+it would be a good security enhancement as invalid arguments can crash the kernel.
+
+2. By seperating the executable name and arguments for argument passing
+it makes the kernel small as the allocation is done by the shell so kernel will
+have more memory. In the other way if the arguments are too large and kernel allocates
+it it might run out of memory therefore there is a possibility that kernel will be crashed 
+if it runs out of memory where as the shell user runs out of memory the system wont be crashed.
+
 
 			     SYSTEM CALLS
 			     ============
@@ -53,9 +80,52 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+in process.h
+>>struct process_info
+  {
+    tid_t tid;          /* tid of the process */
+    tid_t parent_tid;   /* tid of parent process */
+    int status_code;    /* set by exit () syscall */
+    struct list_elem elem;
+  };
+>>in process.h
+struct process_wait_info
+  {
+    struct semaphore sema;
+    tid_t waiting_for_tid;
+    struct list_elem elem;
+  };
+>>in process.h
+struct process_load_info
+  {
+    tid_t parent_tid;
+    bool loaded;
+    struct semaphore sema;
+    struct list_elem elem;
+  };
+
+>>in process.h
+struct process_file
+  {
+    struct file *file;
+    int fd;
+    struct list_elem elem;
+  };
+  // file descriptor struct for managing filesys calls
+  
+  >>in thread.h
+  	added in struct thread
+	   struct list file_list;    //this was created to maintian the opened files
+	    int fd;                  //the number of files opened by this process
+	    struct file* exec;		//purpose of this is to set deny_file_writes using descriptor
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+Each process has its own file descriptor with file counter fd which is incremented when
+a file is opened therefore it is unique within the process supporting openend file counters
+till 2^32 there might be an overflow but it can be handled with big integers.
 
 ---- ALGORITHMS ----
 
@@ -93,6 +163,7 @@ FirstName LastName <email@domain.example>
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
+
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
 >> calls wait(C) before C exits?  After C exits?  How do you ensure
@@ -107,6 +178,10 @@ FirstName LastName <email@domain.example>
 
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
+There will be no race condition in our design as  each process has its own File descriptor 
+therefore no race conditions however it is possible that memory might overflow
+if a process opens lots of files but we can handle the sitation by creating a big integer eg long.
+(See B2 above)
 
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
