@@ -38,13 +38,14 @@ struct file* process_get_file (int fd)
 
   for (e = list_begin (&t->file_list); e != list_end (&t->file_list);
        e = list_next (e))
+    {
+      struct process_file *pf = list_entry (e, struct process_file, elem);
+      if (fd == pf->fd)
         {
-          struct process_file *pf = list_entry (e, struct process_file, elem);
-          if (fd == pf->fd)
-      {
-        return pf->file;
-      }
+          return pf->file;
         }
+    }
+
   return NULL;
 }
 /* adds file to Thread::file_list once it is written
