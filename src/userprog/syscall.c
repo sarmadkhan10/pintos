@@ -118,11 +118,11 @@ _syscall_create (struct intr_frame *f)
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
       (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false) ||
-      (is_uaddr_valid ((int *)f->esp + 2) == false))
+      (is_uaddr_valid ((unsigned *)f->esp + 2) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
-  initial_size = *((int *)f->esp + 2);
+  initial_size = *((unsigned *)f->esp + 2);
 
   f->eax = syscall_create (file, initial_size);
 

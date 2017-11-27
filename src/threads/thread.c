@@ -666,7 +666,7 @@ bool is_current_thread_parent_of (tid_t tid)
   bool ret_val;
   struct thread *t = thread_retrieve (tid);
 
-  if(t == NULL || t->parent_tid != thread_tid ())
+  if((t == NULL) || (t->parent_tid != thread_tid ()))
     ret_val = false;
   else
     ret_val = true;

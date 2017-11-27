@@ -179,10 +179,6 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   int ret_val;
 
-  /* check if child_tid is indeed a child of current process. If not, return -1 */
-  if (is_current_thread_parent_of (child_tid) == false)
-    return -1;
-
   for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
       e = list_next (e))
     {
@@ -199,9 +195,15 @@ process_wait (tid_t child_tid)
         }
     }
 
-  /* if control reaches here, it means the child process is (probably) running */
+  /* if control reaches here, it means the child process is running */
+
+  /* check if child_tid is indeed a child of current process. If not, return -1 */
+  if (is_current_thread_parent_of (child_tid) == false)
+    {
+      return -1;
+    }
+
   /* wait till the process finishes i.e. calls exit () */
-  /* but first check if parent is alive? */
   struct process_wait_info *p_wait = malloc (sizeof (struct process_wait_info));
 
   sema_init (&p_wait->sema, 0);
