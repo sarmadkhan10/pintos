@@ -22,6 +22,7 @@ struct process_wait_info
 struct process_load_info
   {
     tid_t parent_tid;
+    bool loaded;
     struct semaphore sema;
     struct list_elem elem;
   };

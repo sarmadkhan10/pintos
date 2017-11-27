@@ -27,8 +27,9 @@ static struct list processes_dead;
 static struct list processes_waiting;
 static struct list processes_load_waiting;
 
-/* declared in syscall.c */
-extern struct lock filesys_lock;
+static struct lock processes_dead_lock;
+static struct lock processes_waiting_lock;
+static struct lock processes_load_waiting_lock;
 
 /*checks for file-system in Thread::file_list
  * returns NULL if not found
@@ -76,6 +77,10 @@ process_init (void)
   list_init (&processes_dead);
   list_init (&processes_waiting);
   list_init (&processes_load_waiting);
+
+  lock_init (&processes_dead_lock);
+  lock_init (&processes_waiting_lock);
+  lock_init (&processes_load_waiting_lock);
 }
 
 /* Starts a new thread running a user program loaded from
@@ -85,20 +90,26 @@ process_init (void)
 tid_t
 process_execute (const char *file_name)
 {
-  char *fn_copy;
+  char *fn_copy, *fn_copy2;
   char *save_ptr;
   char *program;
+  bool loaded;
 
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
+  /* Make two copies of FILE_NAME.
    Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  program = strtok_r ((char *) file_name, " ", &save_ptr);
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy2 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy2, file_name, PGSIZE);
+
+  program = strtok_r (fn_copy2, " ", &save_ptr);
 
   struct process_load_info *p_load = malloc (sizeof (struct process_load_info));
   p_load->parent_tid = thread_current ()->tid;
@@ -113,11 +124,16 @@ process_execute (const char *file_name)
     }
 
   sema_down (&p_load->sema);
+  /* save the value of loaded i.e. the exe load status */
+  loaded = p_load->loaded;
 
   /* remove from list and free mem */
   list_remove (&p_load->elem);
 
   free (p_load);
+
+  if (loaded == false)
+    tid = TID_ERROR;
 
   return tid;
 }
@@ -139,6 +155,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  lock_acquire (&processes_load_waiting_lock);
   for (e = list_begin (&processes_load_waiting); e != list_end (&processes_load_waiting);
       e = list_next (e))
     {
@@ -146,10 +163,14 @@ start_process (void *file_name_)
 
         /* signal parent */
         if (p_load->parent_tid == thread_current ()->parent_tid)
-          sema_up (&p_load->sema);
+          {
+            sema_up (&p_load->sema);
+            p_load->loaded = success;
+          }
 
         break;
     }
+  lock_release (&processes_load_waiting_lock);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -183,6 +204,7 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   int ret_val;
 
+  lock_acquire (&processes_dead_lock);
   for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
       e = list_next (e))
     {
@@ -195,9 +217,11 @@ process_wait (tid_t child_tid)
           /* set to -1 so that if wait is called again, -1 is returned */
           p->status_code = -1;
 
+          lock_release (&processes_dead_lock);
           return ret_val;
         }
     }
+  lock_release (&processes_dead_lock);
 
   /* if control reaches here, it means the child process is running */
 
@@ -213,8 +237,10 @@ process_wait (tid_t child_tid)
   sema_init (&p_wait->sema, 0);
   p_wait->waiting_for_tid = child_tid;
 
+  lock_acquire (&processes_waiting_lock);
   /* add to waiting processes list */
   list_push_back (&processes_waiting, &p_wait->elem);
+  lock_release (&processes_waiting_lock);
 
   /* wait */
   sema_down(&p_wait->sema);
@@ -224,6 +250,7 @@ process_wait (tid_t child_tid)
   /* deallocate the resources */
   free(p_wait);
 
+  lock_acquire (&processes_dead_lock);
   for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
         e = list_next (e))
     {
@@ -236,6 +263,7 @@ process_wait (tid_t child_tid)
           /* set to -1 so that if wait is called again, -1 is returned */
           p->status_code = -1;
 
+          lock_release (&processes_dead_lock);
           return ret_val;
         }
     }
@@ -252,16 +280,14 @@ process_exit (int status)
   struct list_elem *e;
 
   /* Close all files opened by process */
-    lock_acquire(&filesys_lock);
-    process_close_file(-1);
-    if (cur->exec)
-      {
-        file_close(cur->exec);
-      }
-    lock_release(&filesys_lock);
+  process_close_file(-1);
+  if (cur->exec)
+    {
+      file_close(cur->exec);
+    }
+
   /* remove child processes from processes_dead */
-  //for (e = list_begin (&processes_dead); e != list_end (&processes_dead);
-      //e = list_next (e))
+  lock_acquire (&processes_dead_lock);
   e = list_begin (&processes_dead);
   bool del = false;
   while (true)
@@ -294,7 +320,9 @@ process_exit (int status)
   p_info->status_code = status;
 
   list_push_back (&processes_dead, &p_info->elem);
+  lock_release (&processes_dead_lock);
 
+  lock_acquire (&processes_waiting_lock);
   /* if the parent process is waiting for current process, unblock it */
   for (e = list_begin (&processes_waiting); e != list_end (&processes_waiting);
       e = list_next (e))
@@ -313,7 +341,7 @@ process_exit (int status)
           break;
         }
     }
-
+  lock_release (&processes_waiting_lock);
 
   /* Destroy the current process's page directory and switch back
    to the kernel-only page directory. */
@@ -447,16 +475,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   get_process_args ((char *) file_name, args, &arg_count);
 
   /* Open executable file. */
-    lock_acquire(&filesys_lock);
-    file = filesys_open ((const char *) args[0]);
-       if (file == NULL)
-      {
-        printf ("load: %s: open failed\n",  args[0]);
-        goto done;
-      }
-    file_deny_write(file);
-    t->exec = file;
-
+  file = filesys_open ((const char *) args[0]);
+     if (file == NULL)
+    {
+      printf ("load: %s: open failed\n",  args[0]);
+      goto done;
+    }
+  file_deny_write(file);
+  t->exec = file;
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -538,7 +564,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   done:
   /* We arrive here whether the load is successful or not. */
-  lock_release(&filesys_lock);
   return success;
 }
 

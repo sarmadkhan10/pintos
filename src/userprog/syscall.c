@@ -463,7 +463,6 @@ syscall_close(int fd)
 static void
 syscall_handler (struct intr_frame *f)
 {
-
   if (is_uaddr_valid (f->esp) == false)
     {
       syscall_exit (-1);
