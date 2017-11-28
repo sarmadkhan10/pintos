@@ -18,25 +18,61 @@ struct lock filesys_lock;
 static void syscall_handler (struct intr_frame *);
 int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
 
-/* Checks the validity of the user vaddr. Returns true if uaddr is not
-   null, is not a pointer to kernel vitrual addr. space and is not a
-   pointer to unmapped memory. */
+/* Checks the validity of the user vaddr to vaddr + (size - 1).
+   Currently, size is hardcoded to 3 as we only check for int
+   or unsigned variables here.
+   Returns true if uaddr is not null, is not a pointer to kernel
+   vitrual addr. space and is not a pointer to unmapped memory. */
 static bool
 is_uaddr_valid (void *uaddr)
 {
-  bool valid = false;
+  bool valid = true;
+  int size = 3;
 
-  if ((uaddr != NULL) && (is_user_vaddr (uaddr)))
+  int i;
+  for (i = 0; i < size; i++)
     {
-      if (pagedir_get_page (thread_current()->pagedir, uaddr) != NULL)
+      if (((char *) uaddr + i == NULL) || ((is_user_vaddr ((char *) uaddr + i)) == false) ||
+          (pagedir_get_page (thread_current()->pagedir, (char *) uaddr + i) == NULL))
         {
-          valid = true;
+          valid = false;
+          break;
         }
     }
 
   return valid;
 }
 
+/* Checks the validity of the user str. Returns true if the string
+   is valid i.e. in user virtual memory. */
+bool
+is_string_valid (const void *str)
+{
+  bool valid = true;
+  bool null_term = false;
+
+  while (true)
+    {
+      if (is_uaddr_valid (str) == false)
+        {
+          valid = false;
+          break;
+        }
+
+      if (*((char *) str) == '\0')
+        {
+          null_term = true;
+          break;
+        }
+
+      str = (char *) str + 1;
+    }
+
+  if (null_term == true)
+    return valid;
+  else
+    return false;
+}
 
 void
 syscall_init (void)
@@ -59,6 +95,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+/* simple calls syscall_halt */
 int
 _syscall_halt (struct intr_frame *f UNUSED)
 {
@@ -67,6 +104,7 @@ _syscall_halt (struct intr_frame *f UNUSED)
   return 0;
 }
 
+/* validates user addresses and calls syscall_exit */
 int
 _syscall_exit (struct intr_frame *f)
 {
@@ -82,13 +120,14 @@ _syscall_exit (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_exec */
 int
 _syscall_exec (struct intr_frame *f)
 {
   const char *cmd_line;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
+      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
     syscall_exit (-1);
 
   cmd_line = *((char **) ((char *)f->esp + 4));
@@ -98,6 +137,7 @@ _syscall_exec (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_wait */
 int
 _syscall_wait (struct intr_frame *f)
 {
@@ -111,6 +151,7 @@ _syscall_wait (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_create */
 int
 _syscall_create (struct intr_frame *f)
 {
@@ -118,7 +159,7 @@ _syscall_create (struct intr_frame *f)
   unsigned initial_size;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 2) == false))
     syscall_exit (-1);
 
@@ -130,13 +171,14 @@ _syscall_create (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_remove */
 int
 _syscall_remove (struct intr_frame *f)
 {
   const char *file;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
+      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
@@ -146,13 +188,14 @@ _syscall_remove (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_open */
 int
 _syscall_open (struct intr_frame *f)
 {
   const char *file;
 
   if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 4))) == false))
+      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
@@ -162,6 +205,7 @@ _syscall_open (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_filesize */
 int
 _syscall_filesize (struct intr_frame *f)
 {
@@ -177,6 +221,7 @@ _syscall_filesize (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_read */
 int
 _syscall_read (struct intr_frame *f)
 {
@@ -186,7 +231,7 @@ _syscall_read (struct intr_frame *f)
 
   if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 8))) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 8))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
     syscall_exit (-1);
 
@@ -199,6 +244,7 @@ _syscall_read (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_write */
 int
 _syscall_write (struct intr_frame *f)
 {
@@ -208,7 +254,7 @@ _syscall_write (struct intr_frame *f)
 
   if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
       (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_uaddr_valid (*((char **) ((char *)f->esp + 8))) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 8))) == false) ||
       (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
     syscall_exit (-1);
 
@@ -221,7 +267,7 @@ _syscall_write (struct intr_frame *f)
   return 0;
 }
 
-
+/* validates user addresses and calls syscall_seek */
 int
 _syscall_seek (struct intr_frame *f)
 {
@@ -240,6 +286,7 @@ _syscall_seek (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_tell */
 int
 _syscall_tell (struct intr_frame *f)
 {
@@ -255,6 +302,7 @@ _syscall_tell (struct intr_frame *f)
   return 0;
 }
 
+/* validates user addresses and calls syscall_close */
 int
 _syscall_close(struct intr_frame *f)
 {
@@ -270,13 +318,11 @@ _syscall_close(struct intr_frame *f)
   return 0;
 }
 
-
 void
 syscall_halt(void)
 {
   shutdown_power_off ();
 }
-
 
 void
 syscall_exit (int status)
@@ -285,20 +331,17 @@ syscall_exit (int status)
   thread_exit (status);
 }
 
-
 pid_t
 syscall_exec(const char* cmd_line)
 {
   return process_execute (cmd_line);
 }
 
-
 int
 syscall_wait(pid_t pid)
 {
   return process_wait (pid);
 }
-
 
 bool
 syscall_create(const char* file, unsigned initial_size)
@@ -310,7 +353,6 @@ syscall_create(const char* file, unsigned initial_size)
   return success;
 }
 
-
 bool
 syscall_remove(const char* file)
 {
@@ -320,7 +362,6 @@ syscall_remove(const char* file)
   lock_release(&filesys_lock);
   return success;
 }
-
 
 int
 syscall_open(const char* file)
@@ -337,7 +378,6 @@ syscall_open(const char* file)
     return fd;
 }
 
-
 int
 syscall_filesize(int fd)
 {
@@ -353,7 +393,6 @@ syscall_filesize(int fd)
   lock_release(&filesys_lock);
   return size;
 }
-
 
 int
 syscall_read (int fd, void *buffer, unsigned size)
@@ -385,23 +424,21 @@ syscall_read (int fd, void *buffer, unsigned size)
 
 }
 
-
 int
 syscall_write(int fd, const void *buffer,unsigned size)
 {
   int status = -1;
-  //for console write
+  /* for console write */
   if(fd == STDOUT_FILENO){
       putbuf((char *)buffer, (size_t)size);
       status = (int)size;
   }else{
-
-      //write to file-system
+      /* write to filesystem */
       lock_acquire(&filesys_lock);
          struct file *f = process_get_file(fd);
          if (!f)
            {
-             //error because file was null
+             /* error because file was null */
              lock_release(&filesys_lock);
              return -1;
            }
@@ -409,7 +446,6 @@ syscall_write(int fd, const void *buffer,unsigned size)
          lock_release(&filesys_lock);
     return bytes;
   }
-
 
 return status;
 }
@@ -431,7 +467,6 @@ syscall_seek(int fd,unsigned position)
 
 }
 
-
 unsigned
 syscall_tell(int fd)
 {
@@ -447,9 +482,7 @@ syscall_tell(int fd)
   off_t offset = file_tell(f);
   lock_release(&filesys_lock);
   return offset;
-
 }
-
 
 void
 syscall_close(int fd)
@@ -458,7 +491,6 @@ syscall_close(int fd)
   process_close_file(fd);
   lock_release(&filesys_lock);
 }
-
 
 static void
 syscall_handler (struct intr_frame *f)
@@ -470,6 +502,10 @@ syscall_handler (struct intr_frame *f)
 
   /* get the syscall no. from the stack. */
   int syscall_no = *((int *)(f->esp));
+
+  /* if syscall no. is greater than total syscalls, there is a problem */
+  if (syscall_no >= SYSCALL_TOTAL)
+    PANIC ("SYSCALL NUMBER exceeds total syscalls");
 
   /* invoke syscall */
   syscall_table[syscall_no] (f);

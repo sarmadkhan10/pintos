@@ -279,6 +279,7 @@ process_exit (int status)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   struct list_elem *e;
+  bool lock_held;
 
   /* Close all files opened by process */
   process_close_file(-1);
@@ -286,6 +287,19 @@ process_exit (int status)
     {
       file_close(cur->exec);
     }
+
+  /* it could be that the current process died while holding a lock. free the locks */
+  lock_held = lock_held_by_current_thread (&processes_dead_lock);
+  if (lock_held == true)
+    lock_release (&processes_dead_lock);
+
+  lock_held = lock_held_by_current_thread (&processes_waiting_lock);
+  if (lock_held == true)
+    lock_release (&processes_waiting_lock);
+
+  lock_held = lock_held_by_current_thread (&processes_load_waiting_lock);
+  if (lock_held == true)
+    lock_release (&processes_load_waiting_lock);
 
   /* remove the current thread's child processes from processes_dead list since
      we maintain this list for exit status only. once the parent is dead, the children
@@ -315,14 +329,17 @@ process_exit (int status)
         del = false;
     }
 
-  /* add current process to processes_dead list */
-  struct process_info *p_info = malloc (sizeof (struct process_info));
+  /* add current process to processes_dead list if the parent is still alive */
+  if (thread_retrieve (cur->parent_tid) != NULL)
+    {
+      struct process_info *p_info = malloc (sizeof (struct process_info));
 
-  p_info->tid = cur->tid;
-  p_info->parent_tid = cur->parent_tid;
-  p_info->status_code = status;
+      p_info->tid = cur->tid;
+      p_info->parent_tid = cur->parent_tid;
+      p_info->status_code = status;
 
-  list_push_back (&processes_dead, &p_info->elem);
+      list_push_back (&processes_dead, &p_info->elem);
+    }
   lock_release (&processes_dead_lock);
 
   lock_acquire (&processes_waiting_lock);
@@ -465,9 +482,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-  char *args[30];                        /* max: 10 */
+  char *args[30];                        /* max: 30 */
   int arg_count;
-  //char fn_copy[50];
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -707,6 +723,7 @@ setup_stack (void **esp, char *argv[], int argc)
             memcpy(*esp, argv[counter], strlen (argv[counter]) + 1);
           }
 
+        /* null pointer sentinel */
         *esp = *esp - 4;
         (*(int *)(*esp)) = 0;
 
@@ -724,6 +741,7 @@ setup_stack (void **esp, char *argv[], int argc)
         *esp = *esp - 4;
         *(int *)(*esp) = argc;
 
+        /* fake return address */
         *esp = *esp - 4;
         (*(int *) (*esp)) = 0;
       }

@@ -6,38 +6,25 @@
 
 ---- GROUP ----
 
->> Fill in the names and email addresses of your group members.
-
-Hamza Anwar <s8haanwa@stud.uni-saarland.de>
-FirstName LastName <email@domain.example>
+Hamza Anwar          <s8haanwa@stud.uni-saarland.de>
+Muhammad Sarmad Khan <s8mukhan@stud.uni-saarland.de>
 
 ---- PRELIMINARIES ----
 
->> If you have any preliminary comments on your submission, notes for the
->> TAs, or extra credit, please give them here.
-
->> Please cite any offline or online sources you consulted while
->> preparing your submission, other than the Pintos documentation, course
->> text, lecture notes, and course staff.
+In the test case exec-bound-3, pointer arithmetic has been performed on a void pointer
+(returned by get_bad_boundary ()) which is not a safe operation in C as void pointer
+arithmetic behaviour can vary from compiler to compiler.
 
 			   ARGUMENT PASSING
 			   ================
 
 ---- DATA STRUCTURES ----
 
->> A1: Copy here the declaration of each new or changed `struct' or
+>> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-No new global variables or types were declared for argument
-passing. 
-
-We only changed the following declarations:
-
-	1. static bool setup_stack (void **esp, char *argv[], int argc)
-
-This was done mainly because to pass the arguments seperately then pushed
-to the stack accordingly
+---
 
 ---- ALGORITHMS ----
 
@@ -45,30 +32,47 @@ to the stack accordingly
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+After separating the arguments from the command line, the arguments and
+the number of arguments are passed to the setup_stack function. The
+arguments are pushed on the stack (order doesn't matter as they will
+be referenced through pointers). As explained in the assignment doc,
+the arguments are arranged in the following order: starting from the
+right most argument, the arguments are pused to the stack one by one.
+A process's main function has the following prototype:
+main (int argc, char *argv[])
+So starting from the right most argument, *argv[] is pushed on the
+stack with argv[0] being at the lowest address. These are pointers
+to the arguments pushed on the stack as explained above.
+If the following is the command: "echo a b c"
+Then *argv[3] points to 'c' in the stack.
+A max limit of 30 arguments has been imposed by us in the code.
+However if the argument length exceeds the size of page, this will
+result in a page fault.
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
-In strtok() the token pointer is static and kept internally by the function
-where as in strtok_r() the pointer is passed for getting the next token
-which means if we use strtok() in the kernel there exists a  possible data race where 
-one thread would use the last token held by another thread which is incorrect and will crash
-the kernel
-
-
+In strtok() the token pointer is static and kept internally by the
+function where as in strtok_r() the pointer is passed for getting
+the next token which means if we use strtok() in the kernel there
+exists a  possible data race where one thread would use the last
+token held by another thread which is incorrect and will crash the
+kernel.
 
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
-
-1. The arguments  will be validated  passing the control to kernel therefore so
-it would be a good security enhancement as invalid arguments can crash the kernel.
-
-2. By seperating the executable name and arguments for argument passing
-it makes the kernel small as the allocation is done by the shell so kernel will
-have more memory. In the other way if the arguments are too large and kernel allocates
-it it might run out of memory therefore there is a possibility that kernel will be crashed 
-if it runs out of memory where as the shell user runs out of memory the system wont be crashed.
+1. The arguments  will be validated  passing the control to kernel
+therefore so it would be a good security enhancement as invalid
+arguments can crash the kernel.
+2. By seperating the executable name and arguments for argument
+passing it makes the kernel small as the allocation is done by
+the shell so kernel will have more memory. In the other way if
+the arguments are too large and kernel allocates it it might
+run out of memory therefore there is a possibility that kernel
+will be crashed if it runs out of memory where as the shell user
+runs out of memory the system wont be crashed.
 
 
 			     SYSTEM CALLS
@@ -81,21 +85,27 @@ if it runs out of memory where as the shell user runs out of memory the system w
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
 in process.h
->>struct process_info
+struct process_info
   {
     tid_t tid;          /* tid of the process */
     tid_t parent_tid;   /* tid of parent process */
     int status_code;    /* set by exit () syscall */
     struct list_elem elem;
   };
->>in process.h
+struct process_info is used by process_exit () and process_wait ().
+It keeps track of the exit status of the processes.
+
+in process.h
 struct process_wait_info
   {
     struct semaphore sema;
     tid_t waiting_for_tid;
     struct list_elem elem;
   };
->>in process.h
+struct process_wait_info is used to keep track of the processes
+waiting for their child process to terminate (used by process_wait ()).
+
+in process.h
 struct process_load_info
   {
     tid_t parent_tid;
@@ -103,34 +113,62 @@ struct process_load_info
     struct semaphore sema;
     struct list_elem elem;
   };
+struct process_load_info is used to inform the parent about the load
+status of the child process. Used by exex () syscall.
 
->>in process.h
+in process.h
 struct process_file
   {
     struct file *file;
     int fd;
     struct list_elem elem;
   };
-  // file descriptor struct for managing filesys calls
+struct process_file stores the pointer to a file and its file descriptor.
+It is used to keep track of all the opened files of a process.
   
-  >>in thread.h
-  	added in struct thread
-	   struct list file_list;    //this was created to maintian the opened files
-	    int fd;                  //the number of files opened by this process
-	    struct file* exec;		//purpose of this is to set deny_file_writes using descriptor
+in thread.h
+added in 'struct thread'
+tid parent_tid            /* stores the tid of the parent process */
+struct list file_list;    /* this was created to maintian the opened files */
+int fd;                   /* keeps track of assigned file descriptors */
+struct file* exec;        /* purpose of this is to set deny_file_writes using descriptor */
+
+in process.c
+static struct list processes_dead;
+static struct lock processes_dead_lock;
+The list maintains the info of the processes that have died. Once a processes dies, all of
+its children processes are removed from the list before it itself gets added to it.
+The lock is used for mutual exclusion of the list.
+
+static struct list processes_waiting;
+static struct lock processes_waiting_lock;
+The list maintains info of the processes currently waiting for its child processes to
+terminate (wait () syscall)
+The lock is used for mutual exclusion of the list.
+
+static struct list processes_load_waiting;
+static struct lock processes_load_waiting_lock;
+The list maints info of the child processes being loaded. The load status is returned
+to the parent process (exec () syscall)
+The lock is used for mutual exclusion of the list.
 
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
 
 Each process has its own file descriptor with file counter fd which is incremented when
-a file is opened therefore it is unique within the process supporting openend file counters
-till 2^32 there might be an overflow but it can be handled with big integers.
+a file is opened therefore it is unique within the process. It supports openend file counters
+till 2^32.
 
 ---- ALGORITHMS ----
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+For each system call, the the vailidity of the arguments are checked i.e.
+the address belongs to user virtual space ( < PHYS_BASE) and map to a valid
+address. For string arguments, the addresses of all the string characters are
+verified as explained above. Only after that the kernel goes through with the
+system call. The value returned by the syscall is them stored in eax register.
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -138,9 +176,26 @@ till 2^32 there might be an overflow but it can be handled with big integers.
 >> (e.g. calls to pagedir_get_page()) that might result?  What about
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
+In the current implementation, for a full page, 4096 inspections have
+to be done as we can't be sure that the next byte resides in the same
+page. For 2 bytes, 2 inspections have to be done. In an ideal case
+scenario, maximum of 2 inspections should be done for
+the two discussed cases as these can be divided into two pages at max.
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+When a parent process calls wait syscall passing pid of the child
+process, first of all the list of dead processes is check to see if
+the child is already dead. If it is, the stored exit status is returned
+to the parent and the status code is updated to -1 (so that a future
+wait call returns -1).
+If the child process is alive, the parent process info is pused on the
+waiting for processes list and the parent process blocks. Just before
+the child processes terminates, it checks whether its parent process
+is blocked on it. If yes, it unblocks its parent process and dies. This
+process is now in the dead processes list. The parent now again
+traverses the dead processes list and retrieves the exit status of the
+child.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -155,6 +210,19 @@ till 2^32 there might be an overflow but it can be handled with big integers.
 >> allocated resources (locks, buffers, etc.) are freed?  In a few
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
+The error checking code has been divided into functions. Each function
+check different kind of errors e.g. is_uaddr_valid(). However, in the
+current design all user access related errors make the process exit
+with -1 status code. This is not an optimal choice since it is not
+apparent from the error code from where the error occured. But it
+does make the error-handling code small.
+In the error handling code, we have tried to ensure that whenever
+an error occurs that will result in process termination, the allocated
+resources are freed. However, due to the complexity of code, one can
+never be too careful. So, e.g. in the process_exit () function we
+free all the locks that a process can acquire to make sure if the
+process terminates without freeing an acquired lock, it gets free
+before termination.
 
 ---- SYNCHRONIZATION ----
 
@@ -162,7 +230,15 @@ till 2^32 there might be an overflow but it can be handled with big integers.
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
-
+The is done using the list processes_load_waiting which contains the
+info of all the processes currently waiting for their child to load.
+Each member has a semaphore. When a a parent process loads a child,
+it adds its info in the list and 'downs' the semaphore and gets blocked.
+When the child load function returns, it traverses the above mentioned
+list, finds its parent, updates the 'loaded' attribute with the load
+return value and 'ups' the semaphore which unblocks the parent. The
+parent then removes its info from the list and retrives the loaded
+attribute which was set by the child.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -170,21 +246,40 @@ till 2^32 there might be an overflow but it can be handled with big integers.
 >> that all resources are freed in each case?  How about when P
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
+If P calls wait before C exits, the process P adds a new member to
+processes_waiting list. This member contains a semapore. P 'downs'
+this semaphore and gets blocked. When a process exits, it checks
+the list to see if a parent is waiting for it (by comparin parent tid)
+and if yes, 'ups' the semaphore to unblock the parent.
+If P calls wait after C exits, the parent checks the dead_processes
+first to see if the child is already dead. If yes, it finds it in the
+list. The list members contains the child exit code.
+If P terminates without waiting before C exits, its children (if any)
+are removed from the dead_processes list. Now when C exits, it
+won't be added to the list of dead processes since its parent is
+already dead.
+The list of dead processes is mutually exlusive (using lock) so
+multiple processes cannot modify at the same time.
 
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
+We chose to simply check if the user provided is indeed in the user
+virutal memory ( < PHYS_BASE) and is not an unmapped memory. This
+approach is not faster than the other one explained in the assignment
+doc which makes use of MMU but is intuitve and easy to implement.
 
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
-There will be no race condition in our design as  each process has its own File descriptor 
-therefore no race conditions however it is possible that memory might overflow
-if a process opens lots of files but we can handle the sitation by creating a big integer eg long.
-(See B2 above)
+There will be no race condition in our design as each process has its
+own file descriptor. Therefore, no race conditions. However, it is
+possible that memory might overflow if a process opens lots of files
+but that's a rare corner case.
 
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+We did not change it and simply used tid_t as pid_t.
 
 			   SURVEY QUESTIONS
 			   ================
