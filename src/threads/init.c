@@ -28,18 +28,18 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
-#else
+#else /* USERPROG */
 #include "tests/threads/tests.h"
-#endif
-#ifndef VM
+#endif /* USERPROG */
+#ifdef VM
 #include "vm/frame.h"
-#endif
+#endif /* VM */
 #ifdef FILESYS
 #include "devices/block.h"
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
-#endif
+#endif /* FILESYS */
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
