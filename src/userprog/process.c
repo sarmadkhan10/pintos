@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 //vm frame methods
 #ifndef VM
@@ -295,6 +296,10 @@ process_exit (int status)
       file_close(cur->exec);
     }
 
+#ifdef VM
+  spt_delete_supp_page_table (cur->spt);
+#endif /* VM */
+
   /* it could be that the current process died while holding a lock. free the locks */
   lock_held = lock_held_by_current_thread (&processes_dead_lock);
   if (lock_held == true)
@@ -496,6 +501,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
     goto done;
+
+  /* allocate SPT */
+#ifdef VM
+  spt_create_supp_page_table (t->spt);
+#endif /* VM */
+
   process_activate ();
 
   get_process_args ((char *) file_name, args, &arg_count);
@@ -677,22 +688,27 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
       /* Get a page of memory. */
       uint8_t *kpage = vm_frame_allocate  (PAL_USER);
       if (kpage == NULL)
-  return false;
+        return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-  {
-    vm_frame_free (kpage);
-    return false;
-  }
+        {
+          vm_frame_free (kpage);
+          return false;
+        }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable))
-  {
+        {
           vm_frame_free (kpage);
-    return false;
-  }
+          return false;
+        }
+
+#ifdef VM
+      /* add entry in the supplementary page table */
+      spt_set_page (thread_current ()->spt, (void *) upage, writable);
+#endif /* VM */
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -716,6 +732,10 @@ setup_stack (void **esp, char *argv[], int argc)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
       {
+#ifdef VM
+          /* add entry in the supplementary page table */
+          spt_set_page (thread_current ()->spt, ((uint8_t *) PHYS_BASE) - PGSIZE, true);
+#endif /* VM */
         *esp = PHYS_BASE;
 
         int counter = argc;
@@ -775,7 +795,8 @@ install_page (void *upage, void *kpage, bool writable)
   /* Verify that there's not already a page at that virtual
    address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
-      && pagedir_set_page (t->pagedir, upage, kpage, writable));
+      && pagedir_set_page (t->pagedir, upage, kpage, writable)
+  );
 }
 
 /* get the process args + the number of args from cmd */

@@ -5,6 +5,9 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#ifdef VM
+#include "vm/page.h"
+#endif /* VM */
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -107,6 +110,10 @@ struct thread
     int fd;                             /* the file descriptor assigned to newly opened file.
                                            gets incremented every time */
     struct file *exec;                  /* the process executable file */
+#endif
+
+#ifdef VM
+    struct supp_page_table *spt;        /* supplemental page table (per process). */
 #endif
 
     /* Owned by thread.c. */
