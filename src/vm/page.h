@@ -13,6 +13,11 @@ enum page_loc
     ZEROED
   };
 
+/* page error codes */
+#define    ACCESS_VIOLATION -1
+#define    MEM_ALLOC_FAIL  -2
+#define    PAGE_NOT_FOUND   -3
+
 struct supp_page_table
   {
     struct hash spt;
@@ -26,8 +31,10 @@ struct supp_page_table_entry
     bool writable;           /* true if write allowed. otherwise read-only */
   };
 
-void    spt_create_supp_page_table (struct supp_page_table *);
-void    spt_delete_supp_page_table (struct supp_page_table *);
-bool    spt_set_page (struct supp_page_table *, void *, bool );
+void                          spt_create_supp_page_table (struct supp_page_table *);
+void                          spt_delete_supp_page_table (struct supp_page_table *);
+bool                          spt_set_page (struct supp_page_table *, void *, bool );
+struct supp_page_table_entry  *spt_find_page (struct supp_page_table *, void *);
+int                           vm_load_page (struct supp_page_table *, uint32_t *, void *, bool );
 
 #endif /* VM_PAGE_H */
