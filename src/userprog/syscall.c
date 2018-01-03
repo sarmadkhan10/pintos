@@ -45,7 +45,7 @@ is_uaddr_valid (void *uaddr)
 
 /* Checks the validity of the user str. Returns true if the string
    is valid i.e. in user virtual memory. */
-bool
+static bool
 is_string_valid (const void *str)
 {
   bool valid = true;

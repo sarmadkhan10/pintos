@@ -28,7 +28,8 @@ struct supp_page_table_entry
     struct hash_elem elem;
     void *uaddr;              /* pointer to data that goes in the page (virtual addr of the page) */
     enum page_loc loc;
-    bool writable;           /* true if write allowed. otherwise read-only */
+    bool writable;            /* true if write allowed. otherwise read-only */
+    size_t swap_index;        /* if the page is in swap, this is the index in swap bitmap */
   };
 
 void                          spt_create_supp_page_table (struct supp_page_table *);
