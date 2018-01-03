@@ -13,9 +13,8 @@ static bool     spt_less_hash_func(const struct hash_elem *a, const struct hash_
 
 /* allocate and initialize supplemental page table spt */
 void
-spt_create_supp_page_table (struct supp_page_table *spt)
+spt_init_supp_page_table (struct supp_page_table *spt)
 {
-  spt = malloc (sizeof (struct supp_page_table));
   hash_init (&spt->spt, spt_hash_func, spt_less_hash_func, NULL);
 }
 
@@ -31,6 +30,8 @@ spt_delete_supp_page_table (struct supp_page_table *spt)
 bool
 spt_set_page (struct supp_page_table *spt, void *uaddr, bool writable)
 {
+  ASSERT (spt != NULL);
+
   /* create a new spt entry add the page address in spt */
   struct supp_page_table_entry *spt_entry = malloc (sizeof (struct supp_page_table_entry));
   spt_entry->uaddr = uaddr;
@@ -59,7 +60,7 @@ static unsigned
 spt_hash_func(const struct hash_elem *elem, void *aux UNUSED)
 {
   struct supp_page_table_entry *entry = hash_entry (elem, struct supp_page_table_entry, elem);
-  return hash_bytes (&entry->uaddr, sizeof (entry->uaddr));
+  return hash_bytes (entry->uaddr, sizeof (entry->uaddr));
 }
 
 /* spt less hash function */

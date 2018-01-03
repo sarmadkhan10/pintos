@@ -504,7 +504,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* allocate SPT */
 #ifdef VM
-  spt_create_supp_page_table (t->spt);
+  t->spt = malloc (sizeof (struct supp_page_table));
+  spt_init_supp_page_table (t->spt);
 #endif /* VM */
 
   process_activate ();

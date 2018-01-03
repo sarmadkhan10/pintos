@@ -32,7 +32,7 @@ struct supp_page_table_entry
     size_t swap_index;        /* if the page is in swap, this is the index in swap bitmap */
   };
 
-void                          spt_create_supp_page_table (struct supp_page_table *);
+void                          spt_init_supp_page_table (struct supp_page_table *);
 void                          spt_delete_supp_page_table (struct supp_page_table *);
 bool                          spt_set_page (struct supp_page_table *, void *, bool );
 struct supp_page_table_entry  *spt_find_page (struct supp_page_table *, void *);
