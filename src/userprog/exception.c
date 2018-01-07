@@ -166,12 +166,13 @@ page_fault (struct intr_frame *f)
   void *paddr = pg_round_down (fault_addr);
 
   //printf ("here1 not_present: %d addr: 0x%08x\n", not_present, fault_addr);
-  if (not_present && is_user_vaddr (fault_addr) && (PHYS_BASE - fault_addr <= STACK_SIZE_MAX))
+  if (not_present && is_user_vaddr (fault_addr) && (PHYS_BASE - fault_addr <= STACK_SIZE_MAX) &&
+      (fault_addr >= f->esp - 32))
     {
+      /* '- 32' since a PF can occur 32 bytes below the esp */
       loaded = vm_load_page (cur->spt, cur->pagedir, paddr, write);
 
-      /* '- 32' since a PF can occur 32 bytes below the esp */
-      if ((loaded == PAGE_NOT_FOUND) && (fault_addr >= f->esp - 32))
+      if (loaded == PAGE_NOT_FOUND)
         {
           loaded = grow_stack (fault_addr);
         }
@@ -185,15 +186,15 @@ page_fault (struct intr_frame *f)
       /* To implement virtual memory, delete the rest of the function
          body, and replace it with code that brings in the page to
          which fault_addr refers. */
-      printf ("Page fault at %p: %s error %s page in %s context.\n",
+      /*printf ("Page fault at %p: %s error %s page in %s context.\n",
               fault_addr,
               not_present ? "not present" : "rights violation",
               write ? "writing" : "reading",
-              user ? "user" : "kernel");
-      if (user)
+              user ? "user" : "kernel");*/
+      //if (user)
         syscall_exit (-1);
-      else
-        kill (f);
+      //else
+        //kill (f);
     }
 }
 

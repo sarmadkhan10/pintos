@@ -10,7 +10,7 @@
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
-
+#include "vm/page.h"
 
 /* lock for filesystem. */
 struct lock filesys_lock;
@@ -24,19 +24,33 @@ int (*syscall_table[SYSCALL_TOTAL]) (struct intr_frame *);
    Returns true if uaddr is not null, is not a pointer to kernel
    vitrual addr. space and is not a pointer to unmapped memory. */
 static bool
-is_uaddr_valid (void *uaddr)
+is_uaddr_valid (void *uaddr, void *esp)
 {
   bool valid = true;
-  int size = 3;
+  int size = 1;
 
   int i;
   for (i = 0; i < size; i++)
     {
-      if (((char *) uaddr + i == NULL) || ((is_user_vaddr ((char *) uaddr + i)) == false) ||
-          (pagedir_get_page (thread_current()->pagedir, (char *) uaddr + i) == NULL))
+      if (((char *) uaddr + i == NULL) || ((is_user_vaddr ((char *) uaddr + i)) == false))
         {
           valid = false;
           break;
+        }
+      else if (pagedir_get_page (thread_current()->pagedir, pg_round_down ((char *) uaddr + i)) == NULL)
+        {
+          if (uaddr >= esp - 32)
+            {
+              struct thread *cur = thread_current ();
+
+              int loaded = vm_load_page (cur->spt, cur->pagedir, pg_round_down ((char *) uaddr + i), true);
+
+              if (loaded == PAGE_NOT_FOUND)
+                {
+                  /* unmapped memory. bring it in mem */
+                  valid = grow_stack (uaddr);
+                }
+            }
         }
     }
 
@@ -46,14 +60,14 @@ is_uaddr_valid (void *uaddr)
 /* Checks the validity of the user str. Returns true if the string
    is valid i.e. in user virtual memory. */
 static bool
-is_string_valid (const void *str)
+is_string_valid (const void *str, void *esp)
 {
   bool valid = true;
   bool null_term = false;
 
   while (true)
     {
-      if (is_uaddr_valid (str) == false)
+      if (is_uaddr_valid (str, esp) == false)
         {
           valid = false;
           break;
@@ -108,7 +122,7 @@ _syscall_halt (struct intr_frame *f UNUSED)
 int
 _syscall_exit (struct intr_frame *f)
 {
-  if (is_uaddr_valid (((int *)f->esp) + 1) == false)
+  if (is_uaddr_valid (((int *)f->esp) + 1, f->esp) == false)
     {
       syscall_exit (-1);
     }
@@ -126,8 +140,8 @@ _syscall_exec (struct intr_frame *f)
 {
   const char *cmd_line;
 
-  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
+  if ((is_uaddr_valid ((char *)f->esp + 4, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 4)), f->esp) == false))
     syscall_exit (-1);
 
   cmd_line = *((char **) ((char *)f->esp + 4));
@@ -141,7 +155,7 @@ _syscall_exec (struct intr_frame *f)
 int
 _syscall_wait (struct intr_frame *f)
 {
-  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+  if (is_uaddr_valid ((int *)f->esp + 1, f->esp) == false)
     syscall_exit (-1);
 
   int pid = *((int *)f->esp + 1);
@@ -158,9 +172,9 @@ _syscall_create (struct intr_frame *f)
   const char *file;
   unsigned initial_size;
 
-  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false) ||
-      (is_uaddr_valid ((unsigned *)f->esp + 2) == false))
+  if ((is_uaddr_valid ((char *)f->esp + 4, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 4)), f->esp) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 2, f->esp) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
@@ -177,8 +191,8 @@ _syscall_remove (struct intr_frame *f)
 {
   const char *file;
 
-  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
+  if ((is_uaddr_valid ((char *)f->esp + 4, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 4)), f->esp) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
@@ -194,8 +208,8 @@ _syscall_open (struct intr_frame *f)
 {
   const char *file;
 
-  if ((is_uaddr_valid ((char *)f->esp + 4) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 4))) == false))
+  if ((is_uaddr_valid ((char *)f->esp + 4, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 4)), f->esp) == false))
     syscall_exit (-1);
 
   file = *((char **) ((char *)f->esp + 4));
@@ -211,7 +225,7 @@ _syscall_filesize (struct intr_frame *f)
 {
   int fd;
 
-  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+  if (is_uaddr_valid ((int *)f->esp + 1, f->esp) == false)
     syscall_exit (-1);
 
   fd = *((int *)f->esp + 1);
@@ -229,15 +243,24 @@ _syscall_read (struct intr_frame *f)
   char *buffer;
   unsigned size;
 
-  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
-      (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 8))) == false) ||
-      (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
+  if ((is_uaddr_valid ((int *)f->esp + 1, f->esp) == false) ||
+      (is_uaddr_valid ((char *)f->esp + 8, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 8)), f->esp) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 3, f->esp) == false))
     syscall_exit (-1);
+
 
   fd = *((int *)f->esp + 1);
   buffer = *((char **) ((char *)f->esp + 8));
   size = *((unsigned *)f->esp + 3);
+
+  /* verify addresses for the whole size */
+  int i;
+  for (i = 0; i < size; i++)
+    {
+      if (is_uaddr_valid (buffer + i, f->esp) == false)
+        syscall_exit (-1);
+    }
 
   f->eax = syscall_read (fd, buffer, size);
 
@@ -252,10 +275,10 @@ _syscall_write (struct intr_frame *f)
   char* buffer;
   unsigned size;
 
-  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
-      (is_uaddr_valid ((char *)f->esp + 8) == false) ||
-      (is_string_valid (*((char **) ((char *)f->esp + 8))) == false) ||
-      (is_uaddr_valid ((unsigned *)f->esp + 3) == false))
+  if ((is_uaddr_valid ((int *)f->esp + 1, f->esp) == false) ||
+      (is_uaddr_valid ((char *)f->esp + 8, f->esp) == false) ||
+      (is_string_valid (*((char **) ((char *)f->esp + 8)), f->esp) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 3, f->esp) == false))
     syscall_exit (-1);
 
   fd = *((int *)f->esp + 1);
@@ -274,8 +297,8 @@ _syscall_seek (struct intr_frame *f)
   int fd;
   unsigned position;
 
-  if ((is_uaddr_valid ((int *)f->esp + 1) == false) ||
-      (is_uaddr_valid ((unsigned *)f->esp + 2) == false))
+  if ((is_uaddr_valid ((int *)f->esp + 1, f->esp) == false) ||
+      (is_uaddr_valid ((unsigned *)f->esp + 2, f->esp) == false))
     syscall_exit (-1);
 
   fd = *((int *)f->esp + 1);
@@ -292,7 +315,7 @@ _syscall_tell (struct intr_frame *f)
 {
   int fd;
 
-  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+  if (is_uaddr_valid ((int *)f->esp + 1, f->esp) == false)
     syscall_exit (-1);
 
   fd = *((int *)f->esp + 1);
@@ -308,7 +331,7 @@ _syscall_close(struct intr_frame *f)
 {
   int fd;
 
-  if (is_uaddr_valid ((int *)f->esp + 1) == false)
+  if (is_uaddr_valid ((int *)f->esp + 1, f->esp) == false)
     syscall_exit (-1);
 
   fd = *((int *)f->esp + 1);
@@ -495,7 +518,7 @@ syscall_close(int fd)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  if (is_uaddr_valid (f->esp) == false)
+  if (is_uaddr_valid (f->esp, f->esp) == false)
     {
       syscall_exit (-1);
     }

@@ -118,6 +118,7 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
                   PANIC ("vm_load_page: should not reach here.");
               }
 
+              printf ("from vm_load\n");
               if (!pagedir_set_page (pagedir, paddr, frame, spt_e->writable))
                 {
                   error = MEM_ALLOC_FAIL;
@@ -128,6 +129,7 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
                   spt_e->loc = FRAME;
                   pagedir_set_dirty (pagedir, frame, false);
                 }
+              printf ("after vm_load\n");
             }
         }
     }

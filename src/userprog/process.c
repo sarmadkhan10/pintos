@@ -807,7 +807,9 @@ grow_stack (void *uaddr)
             }
           else
             {
-              ret_val = spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
+              //ret_val = spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
+              spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
+              ret_val = true;
             }
         }
     }
