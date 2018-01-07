@@ -48,6 +48,7 @@ vm_frame_allocate (enum palloc_flags flags)
   void *vpage = palloc_get_page (PAL_USER | flags);
   if (vpage == NULL) {
     // page allocation failed. need swappping out after
+    PANIC ("out of frames!");
     return NULL;
   }
 

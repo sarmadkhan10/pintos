@@ -21,7 +21,7 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
-//vm frame methods
+/* vm frame methods */
 #ifndef VM
 #define vm_frame_allocate(x) palloc_get_page(x)
 #define vm_frame_free(x) palloc_free_page(x)
@@ -778,6 +778,43 @@ setup_stack (void **esp, char *argv[], int argc)
     }
   return success;
 }
+
+#ifdef VM
+/* stack growth function. installs a new frame and adds its entry in spt_e at uaddr */
+bool
+grow_stack (void *uaddr)
+{
+  bool ret_val;
+
+  if (PHYS_BASE - pg_round_down(uaddr) > STACK_SIZE_MAX)
+    {
+      ret_val = false;
+    }
+  else
+    {
+      void *frame = vm_frame_allocate (PAL_USER);
+
+      if (frame == NULL)
+        {
+          ret_val = false;
+        }
+      else
+        {
+          if (!install_page (pg_round_down (uaddr), frame, true))
+            {
+              vm_frame_free(frame);
+              ret_val = false;
+            }
+          else
+            {
+              ret_val = spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
+            }
+        }
+    }
+
+  return ret_val;
+}
+#endif /* VM */
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  virtual address KPAGE to the page table.

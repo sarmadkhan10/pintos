@@ -10,8 +10,8 @@
 
 /* Functions for Frame manipulation. */
 
-void vm_frame_init (void);
-void* vm_frame_allocate (enum palloc_flags flags);
-void vm_frame_free (void*);
+void  vm_frame_init (void);
+void  *vm_frame_allocate (enum palloc_flags flags);
+void  vm_frame_free (void*);
 
 #endif /* vm/frame.h */

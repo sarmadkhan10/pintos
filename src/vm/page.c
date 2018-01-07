@@ -47,6 +47,8 @@ spt_set_page (struct supp_page_table *spt, void *uaddr, bool writable)
 struct supp_page_table_entry *
 spt_find_page (struct supp_page_table *spt, void *paddr)
 {
+  ASSERT (spt != NULL);
+
   struct supp_page_table_entry spt_e;
   spt_e.uaddr = paddr;
   struct hash_elem *e;
@@ -60,7 +62,7 @@ static unsigned
 spt_hash_func(const struct hash_elem *elem, void *aux UNUSED)
 {
   struct supp_page_table_entry *entry = hash_entry (elem, struct supp_page_table_entry, elem);
-  return hash_bytes (entry->uaddr, sizeof (entry->uaddr));
+  return hash_int ((int) entry->uaddr);
 }
 
 /* spt less hash function */
@@ -137,3 +139,5 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
 
   return error;
 }
+
+

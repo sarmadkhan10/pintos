@@ -18,6 +18,9 @@ enum page_loc
 #define    MEM_ALLOC_FAIL  -2
 #define    PAGE_NOT_FOUND   -3
 
+/* stack size max limit: 8MB */
+#define STACK_SIZE_MAX 0x00800000
+
 struct supp_page_table
   {
     struct hash spt;
