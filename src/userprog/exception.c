@@ -192,7 +192,7 @@ page_fault (struct intr_frame *f)
               write ? "writing" : "reading",
               user ? "user" : "kernel");*/
       //if (user)
-      //printf ("calling syscall exit addr: 0x%08x\n", fault_addr);
+      //printf ("calling syscall exit addr: 0x%08x, paddr: 0x%08x\n", fault_addr, paddr);
       syscall_exit (-1);
       //else
         //kill (f);

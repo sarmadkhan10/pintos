@@ -7,9 +7,13 @@
 #include <string.h>
 #include "threads/palloc.h"
 #include "vm/frame.h"
+#include "filesys/file.h"
+
+extern struct lock filesys_lock;
 
 static unsigned spt_hash_func(const struct hash_elem *elem, void *aux);
 static bool     spt_less_hash_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+static bool     load_from_filesys (struct supp_page_table_entry *spt_e, void *frame);
 
 /* allocate and initialize supplemental page table spt */
 void
@@ -111,7 +115,7 @@ spt_less_hash_func(const struct hash_elem *a, const struct hash_elem *b, void *a
 int
 vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool write)
 {
-  int error = true;
+  int error_code = true;
 
   struct supp_page_table_entry *spt_e = spt_find_page (spt, paddr);
 
@@ -119,28 +123,28 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
     {
       /* if the process was trying to write to a read-only page, kill it */
       if (!spt_e->writable && write)
-          error = ACCESS_VIOLATION;
+        error_code = ACCESS_VIOLATION;
       else
         {
           /* allocation a frame to store the page */
           void *frame = vm_frame_allocate (PAL_USER);
 
           if (frame == NULL)
-              error = MEM_ALLOC_FAIL;
+            error_code = MEM_ALLOC_FAIL;
           else
             {
               switch (spt_e->loc)
               {
                 case FRAME:
                   /* the page is already present in memory. Continue */
+                  PANIC ("page already present in memory");
                   break;
                 case SWAP:
                   /* TODO */
                   PANIC ("SWAP not implemented yet");
                   break;
                 case FILE_SYS:
-                  /* TODO */
-                  PANIC ("Loading from filesys not implemented yet");
+                  error_code = load_from_filesys (spt_e, frame);
                   break;
                 case ZEROED:
                   memset (frame, 0, PGSIZE);
@@ -149,15 +153,19 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
                   PANIC ("vm_load_page: should not reach here.");
               }
 
-              if (!pagedir_set_page (pagedir, paddr, frame, spt_e->writable))
+              /* if no error occurred */
+              if (error_code)
                 {
-                  error = MEM_ALLOC_FAIL;
-                  vm_frame_free (frame);
-                }
-              else
-                {
-                  spt_e->loc = FRAME;
-                  pagedir_set_dirty (pagedir, frame, false);
+                  if (!pagedir_set_page (pagedir, paddr, frame, spt_e->writable))
+                    {
+                      error_code = MEM_ALLOC_FAIL;
+                      vm_frame_free (frame);
+                    }
+                  else
+                    {
+                      spt_e->loc = FRAME;
+                      pagedir_set_dirty (pagedir, frame, false);
+                    }
                 }
             }
         }
@@ -165,10 +173,47 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
   else
     {
       /* page not found in spt */
-      error = PAGE_NOT_FOUND;
+      error_code = PAGE_NOT_FOUND;
     }
 
-  return error;
+  return error_code;
+}
+
+/* loads a page from filesys to frame */
+static bool
+load_from_filesys (struct supp_page_table_entry *spt_e, void *frame)
+{
+  bool ret_val = true;
+
+  if (!frame)
+    {
+      ret_val = false;
+    }
+  else
+    {
+      /* if there are bytes to be read from file */
+      if (spt_e->read_bytes > 0)
+        {
+          lock_acquire (&filesys_lock);
+
+          if (file_read_at (spt_e->file, frame, spt_e->read_bytes, spt_e->ofs) !=
+              (int) spt_e->read_bytes)
+            {
+              /* if read fails, return false */
+              vm_frame_free (frame);
+              ret_val = false;
+            }
+
+          lock_release (&filesys_lock);
+        }
+
+      if (ret_val)
+        {
+          memset (frame + spt_e->read_bytes, 0, spt_e->zero_bytes);
+        }
+    }
+
+  return ret_val;
 }
 
 

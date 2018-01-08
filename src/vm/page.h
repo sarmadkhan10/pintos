@@ -15,9 +15,9 @@ enum page_loc
   };
 
 /* page error codes */
-#define    ACCESS_VIOLATION -1
-#define    MEM_ALLOC_FAIL  -2
-#define    PAGE_NOT_FOUND   -3
+#define    ACCESS_VIOLATION   -1
+#define    MEM_ALLOC_FAIL     -2
+#define    PAGE_NOT_FOUND     -3
 
 /* stack size max limit: 8MB */
 #define STACK_SIZE_MAX 0x00800000
