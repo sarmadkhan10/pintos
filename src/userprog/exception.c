@@ -167,12 +167,12 @@ page_fault (struct intr_frame *f)
 
   //printf ("here1 not_present: %d addr: 0x%08x\n", not_present, fault_addr);
   if (not_present && is_user_vaddr (fault_addr) && (PHYS_BASE - fault_addr <= STACK_SIZE_MAX) &&
-      (fault_addr >= f->esp - 32))
+      (fault_addr >= START_UVADDR))
     {
-      /* '- 32' since a PF can occur 32 bytes below the esp */
       loaded = vm_load_page (cur->spt, cur->pagedir, paddr, write);
 
-      if (loaded == PAGE_NOT_FOUND)
+      /* '- 32' since a PF can occur 32 bytes below the esp */
+      if ((loaded == PAGE_NOT_FOUND) && (fault_addr >= f->esp - 32))
         {
           loaded = grow_stack (fault_addr);
         }
@@ -192,7 +192,8 @@ page_fault (struct intr_frame *f)
               write ? "writing" : "reading",
               user ? "user" : "kernel");*/
       //if (user)
-        syscall_exit (-1);
+      //printf ("calling syscall exit addr: 0x%08x\n", fault_addr);
+      syscall_exit (-1);
       //else
         //kill (f);
     }

@@ -686,6 +686,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+#if 0
       /* Get a page of memory. */
       uint8_t *kpage = vm_frame_allocate  (PAL_USER);
       if (kpage == NULL)
@@ -705,10 +706,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
           vm_frame_free (kpage);
           return false;
         }
+#endif /* 0 */
 
 #ifdef VM
       /* add entry in the supplementary page table */
-      spt_set_page (thread_current ()->spt, (void *) upage, writable);
+      bool added = spt_add_page (thread_current ()->spt, (void *) upage, writable, file, ofs,
+                                 page_read_bytes, page_zero_bytes, FILE_SYS);
+
+      if (!added)
+        NOT_REACHED ();
 #endif /* VM */
 
       /* Advance. */

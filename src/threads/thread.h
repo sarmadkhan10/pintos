@@ -115,7 +115,6 @@ struct thread
 #ifdef VM
     struct supp_page_table *spt;        /* supplemental page table (per process). */
 #endif
-    void *esp;                          /* stack pointer needed for kernel page faults */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

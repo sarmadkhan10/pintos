@@ -57,6 +57,37 @@ spt_find_page (struct supp_page_table *spt, void *paddr)
   return (e != NULL) ? hash_entry (e, struct supp_page_table_entry, elem) : NULL;
 }
 
+bool
+spt_add_page (struct supp_page_table *spt, void *paddr, bool writable, struct file *file,
+                   off_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_loc loc)
+{
+  bool inserted;
+
+  /* check if an entry for paddr already exists */
+  struct supp_page_table_entry *spt_e = spt_find_page (spt, paddr);
+
+  if (spt_e != NULL)
+    {
+      inserted = false;
+    }
+  else
+    {
+      /* create a new spt entry add the page address in spt */
+      struct supp_page_table_entry *spt_entry = malloc (sizeof (struct supp_page_table_entry));
+      spt_entry->uaddr = paddr;
+      spt_entry->writable = writable;
+      spt_entry->file = file;
+      spt_entry->ofs = ofs;
+      spt_entry->read_bytes = read_bytes;
+      spt_entry->zero_bytes = zero_bytes;
+      spt_entry->loc = loc;
+
+      inserted = (hash_insert (&spt->spt, &spt_entry->elem) == NULL) ? true : false;
+    }
+
+  return inserted;
+}
+
 /* spt hash function for hash */
 static unsigned
 spt_hash_func(const struct hash_elem *elem, void *aux UNUSED)
@@ -118,7 +149,6 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
                   PANIC ("vm_load_page: should not reach here.");
               }
 
-              printf ("from vm_load\n");
               if (!pagedir_set_page (pagedir, paddr, frame, spt_e->writable))
                 {
                   error = MEM_ALLOC_FAIL;
@@ -129,7 +159,6 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
                   spt_e->loc = FRAME;
                   pagedir_set_dirty (pagedir, frame, false);
                 }
-              printf ("after vm_load\n");
             }
         }
     }
