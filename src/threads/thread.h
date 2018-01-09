@@ -116,7 +116,6 @@ struct thread
     struct supp_page_table *spt;        /* supplemental page table (per process). */
     struct list mmap_list;              /* List of struct mmap_desc. */
 #endif
-    void *esp;                          /* stack pointer needed for kernel page faults */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
