@@ -216,66 +216,6 @@ load_from_filesys (struct supp_page_table_entry *spt_e, void *frame)
   return ret_val;
 }
 
-
-bool
-spt_add_page (struct supp_page_table *spt, void *paddr, bool writable, struct file *file,
-                   off_t ofs, uint32_t read_bytes, uint32_t zero_bytes, enum page_loc loc)
-{
-  bool inserted;
-
-  /* check if an entry for paddr already exists */
-  struct supp_page_table_entry *spt_e = spt_find_page (spt, paddr);
-
-  if (spt_e != NULL)
-    {
-      inserted = false;
-    }
-  else
-    {
-      /* create a new spt entry add the page address in spt */
-      struct supp_page_table_entry *spt_entry = malloc (sizeof (struct supp_page_table_entry));
-      spt_entry->uaddr = paddr;
-      spt_entry->writable = writable;
-      spt_entry->file = file;
-      spt_entry->ofs = ofs;
-      spt_entry->read_bytes = read_bytes;
-      spt_entry->zero_bytes = zero_bytes;
-      spt_entry->loc = loc;
-
-      inserted = (hash_insert (&spt->spt, &spt_entry->elem) == NULL) ? true : false;
-    }
-
-  return inserted;
-}
-
-
-/**
- * Install a page (specified by the starting address `upage`)
- * on the supplemental page table, of type FROM_FILESYS.
-
-bool
-vm_spt_install_filesys (struct supp_page_table *supt, void *upage,
-                         struct file * file, off_t offset, uint32_t read_bytes, uint32_t zero_bytes, bool writable)
-{
-  struct supp_page_table_entry *spte;
-  spte = (struct supp_page_table_entry *) malloc(sizeof(struct supp_page_table_entry));
-
-  spte->uaddr = upage;
-  spte->loc = FILE_SYS;
-  spte->file = file;
-  spte->ofs = offset;
-  spte->read_bytes = read_bytes;
-  spte->zero_bytes = zero_bytes;
-  spte->writable = writable;
-
-  struct hash_elem *prev_elem;
-  prev_elem = hash_insert (&supt->spt, &spte->elem);
-  if (prev_elem == NULL) return true;
-
-  // TODO there is already an entry.
-  PANIC("Duplicated SUPT entry for filesys-page");
-  return false;
-}*/
 struct supp_page_table_entry*
 vm_spt_lookup (struct supp_page_table *supt, void *page)
 {
