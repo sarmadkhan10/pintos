@@ -70,6 +70,8 @@ int process_add_file (struct file *f)
   pf->file = f;
   pf->fd = thread_current()->fd;
   thread_current()->fd++;
+
+
   list_push_back(&thread_current()->file_list, &pf->elem);
   return pf->fd;
 }

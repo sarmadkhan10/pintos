@@ -2,7 +2,7 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
-#include "userprog/syscall.h"
+
 
 struct process_info
   {
