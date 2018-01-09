@@ -23,7 +23,7 @@
 
 /* vm frame methods */
 #ifndef VM
-#define vm_frame_allocate(x) palloc_get_page(x)
+#define vm_frame_allocate(x, y) palloc_get_page(x)
 #define vm_frame_free(x) palloc_free_page(x)
 #endif
 
@@ -696,28 +696,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-#if 0
-      /* Get a page of memory. */
-      uint8_t *kpage = vm_frame_allocate (PAL_USER);
-      if (kpage == NULL)
-        return false;
-
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          vm_frame_free (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          vm_frame_free (kpage);
-          return false;
-        }
-#endif /* 0 */
-
 #ifdef VM
       /* add entry in the supplementary page table */
       bool added = spt_add_page (thread_current ()->spt, (void *) upage, writable, file, ofs,
@@ -744,7 +722,7 @@ setup_stack (void **esp, char *argv[], int argc)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = vm_frame_allocate (PAL_USER | PAL_ZERO);
+  kpage = vm_frame_allocate (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -809,7 +787,7 @@ grow_stack (void *uaddr)
     }
   else
     {
-      void *frame = vm_frame_allocate (PAL_USER);
+      void *frame = vm_frame_allocate (PAL_USER, pg_round_down(uaddr));
 
       if (frame == NULL)
         {
@@ -824,7 +802,6 @@ grow_stack (void *uaddr)
             }
           else
             {
-              //ret_val = spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
               spt_set_page (thread_current ()->spt, pg_round_down (uaddr), true);
               ret_val = true;
             }

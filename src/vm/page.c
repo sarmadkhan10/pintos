@@ -127,7 +127,7 @@ vm_load_page (struct supp_page_table *spt, uint32_t *pagedir, void *paddr, bool 
       else
         {
           /* allocation a frame to store the page */
-          void *frame = vm_frame_allocate (PAL_USER);
+          void *frame = vm_frame_allocate (PAL_USER, paddr);
 
           if (frame == NULL)
             error_code = MEM_ALLOC_FAIL;

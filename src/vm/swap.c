@@ -7,6 +7,8 @@
 
 static struct block *swap_block;
 
+static struct lock swap_lock;
+
 /* no. of sectors in swap block */
 static block_sector_t swap_size;
 
@@ -19,6 +21,8 @@ static struct bitmap *swap_bitmap;
 void
 swap_init (void)
 {
+  lock_init (&swap_lock);
+
   swap_block = block_get_role (BLOCK_SWAP);
 
   if (swap_block == NULL)
@@ -43,11 +47,14 @@ swap_init (void)
 }
 
 /* writes to a (unused) slot in swap. and returns the index (in swap_bitmap). if swap is
-   full, return SWAP_FULL. extern sync required */
+   full, return SWAP_FULL.*/
 size_t
 swap_write_to_unused_slot (void *page)
 {
   ASSERT (page >= PHYS_BASE);
+
+  lock_acquire (&swap_lock);
+
   size_t start = bitmap_scan (swap_bitmap, 0, SECTORS_PER_PAGE, true);
 
   if (start != BITMAP_ERROR)
@@ -69,6 +76,8 @@ swap_write_to_unused_slot (void *page)
       printf ("swap is full.\n");
     }
 
+  lock_release (&swap_lock);
+
   return start;
 }
 
@@ -79,6 +88,8 @@ swap_read_from_slot (size_t start_index, void *page)
 {
   ASSERT (start_index < swap_size);
   ASSERT (page >= PHYS_BASE);
+
+  lock_acquire (&swap_lock);
 
   /* verify the region start_index to start_index + SECTORS_PER_PAGE in swap block is marked as taken */
   if (bitmap_any ((const struct bitmap *) swap_bitmap, start_index, SECTORS_PER_PAGE))
@@ -95,4 +106,6 @@ swap_read_from_slot (size_t start_index, void *page)
 
   /* once we have read the 4 sectors, we can mark these as free */
   bitmap_set_multiple (swap_bitmap, start_index, SECTORS_PER_PAGE, true);
+
+  lock_release (&swap_lock);
 }

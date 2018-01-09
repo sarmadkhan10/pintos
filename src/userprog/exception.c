@@ -151,21 +151,12 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  //if (user)
-    //{
-//#ifndef VM
-
-  /* if the exception is from a user process, kill the process */
-      //syscall_exit (-1);
-
-//#else /* VM */
   int loaded = false;
 
   struct thread *cur = thread_current ();
   /* starting address of page */
   void *paddr = pg_round_down (fault_addr);
 
-  //printf ("here1 not_present: %d addr: 0x%08x\n", not_present, fault_addr);
   if (not_present && is_user_vaddr (fault_addr) && (PHYS_BASE - fault_addr <= STACK_SIZE_MAX) &&
       (fault_addr >= START_UVADDR))
     {
@@ -178,24 +169,10 @@ page_fault (struct intr_frame *f)
         }
      }
 
-//#endif /* VM */
-    //}
-
-  if (!loaded)
+  if (loaded <= 0)
     {
-      /* To implement virtual memory, delete the rest of the function
-         body, and replace it with code that brings in the page to
-         which fault_addr refers. */
-      /*printf ("Page fault at %p: %s error %s page in %s context.\n",
-              fault_addr,
-              not_present ? "not present" : "rights violation",
-              write ? "writing" : "reading",
-              user ? "user" : "kernel");*/
-      //if (user)
       //printf ("calling syscall exit addr: 0x%08x, paddr: 0x%08x\n", fault_addr, paddr);
       syscall_exit (-1);
-      //else
-        //kill (f);
     }
 }
 
