@@ -296,9 +296,17 @@ process_exit (int status)
       file_close(cur->exec);
     }
 
-#ifdef VM
+    struct list *mmlist = &cur->mmap_list;
+  while (!list_empty(mmlist)) {
+    struct list_elem *e = list_begin (mmlist);
+    struct mmap_desc *desc = list_entry(e, struct mmap_desc, elem);
+
+    // in sys_munmap(), the element is removed from the list
+    ASSERT( syscall_munmap (desc->id) == true );
+}
   spt_delete_supp_page_table (cur->spt);
-#endif /* VM */
+
+
 
   /* it could be that the current process died while holding a lock. free the locks */
   lock_held = lock_held_by_current_thread (&processes_dead_lock);

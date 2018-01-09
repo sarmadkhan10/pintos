@@ -35,6 +35,17 @@ struct process_file
     struct list_elem elem;
   };
 
+
+typedef int mmapid_t;
+struct mmap_desc {
+    mmapid_t id;
+    struct list_elem elem;
+    struct file* file;
+
+    void *addr;   // where it is mapped to? store the user virtual address
+    size_t size;  // file size
+};
+
 void process_init (void);
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
